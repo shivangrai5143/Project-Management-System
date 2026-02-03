@@ -1,27 +1,48 @@
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { useStandupBot } from '../context/StandupBotContext';
 import Card from '../components/ui/Card';
 import Input from '../components/ui/Input';
 import Button from '../components/ui/Button';
 import Avatar from '../components/ui/Avatar';
-import { User, Mail, Lock, Bell, Palette, Save } from 'lucide-react';
+import { User, Mail, Lock, Bell, Palette, Save, Bot, Clock, Github, Sparkles } from 'lucide-react';
+import { connectGitHub, disconnectGitHub, isGitHubConnected, getGitHubUsername } from '../utils/githubSimulator';
 
 const SettingsPage = () => {
     const { user, updateProfile } = useAuth();
     const { isDark, toggleTheme } = useTheme();
+    const { settings, updateSettings, triggerStandup } = useStandupBot();
 
     const [formData, setFormData] = useState({
         name: user?.name || '',
         email: user?.email || '',
     });
     const [isSaving, setIsSaving] = useState(false);
+    const [gitHubConnected, setGitHubConnected] = useState(isGitHubConnected());
+    const [gitHubUsername, setGitHubUsername] = useState(getGitHubUsername());
 
     const handleSave = async () => {
         setIsSaving(true);
         await new Promise(resolve => setTimeout(resolve, 500));
         updateProfile(formData);
         setIsSaving(false);
+    };
+
+    const handleGitHubToggle = () => {
+        if (gitHubConnected) {
+            disconnectGitHub();
+            setGitHubConnected(false);
+        } else {
+            connectGitHub(gitHubUsername);
+            setGitHubConnected(true);
+        }
+    };
+
+    const handleTriggerDemo = () => {
+        if (user) {
+            triggerStandup(user.id, user.name, true);
+        }
     };
 
     return (
@@ -64,6 +85,167 @@ const SettingsPage = () => {
                 </div>
             </Card>
 
+            {/* Standup Bot */}
+            <Card padding="lg">
+                <div className="flex items-center justify-between mb-6">
+                    <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+                        <Bot className="w-5 h-5 text-indigo-400" />
+                        Standup Bot
+                        <Sparkles className="w-4 h-4 text-indigo-400" />
+                    </h2>
+                    <button
+                        onClick={handleTriggerDemo}
+                        className="px-3 py-1.5 text-xs font-medium bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 rounded-lg hover:bg-indigo-500/30 transition-colors"
+                    >
+                        Demo Now
+                    </button>
+                </div>
+
+                <div className="space-y-6">
+                    {/* Enable/Disable Toggle */}
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <p className="font-medium text-white">Enable Daily Standup</p>
+                            <p className="text-sm text-slate-400">Get reminded to share your daily update</p>
+                        </div>
+                        <button
+                            onClick={() => updateSettings({ enabled: !settings.enabled })}
+                            className={`
+                                relative w-14 h-8 rounded-full transition-colors
+                                ${settings.enabled ? 'bg-indigo-500' : 'bg-slate-600'}
+                            `}
+                        >
+                            <div
+                                className={`
+                                    absolute top-1 w-6 h-6 rounded-full bg-white shadow-lg
+                                    transition-transform
+                                    ${settings.enabled ? 'left-7' : 'left-1'}
+                                `}
+                            />
+                        </button>
+                    </div>
+
+                    {/* Standup Time */}
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <p className="font-medium text-white flex items-center gap-2">
+                                <Clock className="w-4 h-4 text-slate-400" />
+                                Standup Time
+                            </p>
+                            <p className="text-sm text-slate-400">When should I ask for your update?</p>
+                        </div>
+                        <input
+                            type="time"
+                            value={settings.standupTime}
+                            onChange={(e) => updateSettings({ standupTime: e.target.value })}
+                            className="px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+                        />
+                    </div>
+
+                    {/* Snooze Duration */}
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <p className="font-medium text-white">Snooze Duration</p>
+                            <p className="text-sm text-slate-400">How long to wait before reminding again</p>
+                        </div>
+                        <select
+                            value={settings.snoozeDuration}
+                            onChange={(e) => updateSettings({ snoozeDuration: parseInt(e.target.value) })}
+                            className="px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+                        >
+                            <option value={15}>15 minutes</option>
+                            <option value={30}>30 minutes</option>
+                            <option value={60}>1 hour</option>
+                            <option value={120}>2 hours</option>
+                        </select>
+                    </div>
+
+                    {/* Auto-suggest Toggle */}
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <p className="font-medium text-white">Smart Suggestions</p>
+                            <p className="text-sm text-slate-400">Suggest updates based on your activity</p>
+                        </div>
+                        <button
+                            onClick={() => updateSettings({ autoSuggest: !settings.autoSuggest })}
+                            className={`
+                                relative w-14 h-8 rounded-full transition-colors
+                                ${settings.autoSuggest ? 'bg-indigo-500' : 'bg-slate-600'}
+                            `}
+                        >
+                            <div
+                                className={`
+                                    absolute top-1 w-6 h-6 rounded-full bg-white shadow-lg
+                                    transition-transform
+                                    ${settings.autoSuggest ? 'left-7' : 'left-1'}
+                                `}
+                            />
+                        </button>
+                    </div>
+
+                    {/* GitHub Connection */}
+                    <div className="pt-4 border-t border-slate-700/50">
+                        <div className="flex items-center justify-between mb-3">
+                            <div>
+                                <p className="font-medium text-white flex items-center gap-2">
+                                    <Github className="w-4 h-4 text-slate-400" />
+                                    GitHub Integration
+                                </p>
+                                <p className="text-sm text-slate-400">
+                                    {gitHubConnected
+                                        ? `Connected as @${gitHubUsername} - fetching real activity`
+                                        : 'Connect to include commit activity in your standups'}
+                                </p>
+                            </div>
+                            <button
+                                onClick={handleGitHubToggle}
+                                className={`
+                                    px-4 py-2 rounded-lg text-sm font-medium transition-colors
+                                    ${gitHubConnected
+                                        ? 'bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30'
+                                        : 'bg-indigo-500 text-white hover:bg-indigo-600'
+                                    }
+                                `}
+                            >
+                                {gitHubConnected ? 'Disconnect' : 'Connect'}
+                            </button>
+                        </div>
+
+                        {!gitHubConnected && (
+                            <div className="mt-3">
+                                <label className="block text-sm font-medium text-slate-400 mb-2">
+                                    GitHub Username
+                                </label>
+                                <input
+                                    type="text"
+                                    value={gitHubUsername}
+                                    onChange={(e) => setGitHubUsername(e.target.value)}
+                                    placeholder="e.g., shivangrai5143"
+                                    className="w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 placeholder-slate-500"
+                                />
+                            </div>
+                        )}
+
+                        {gitHubConnected && (
+                            <div className="mt-2 flex items-center gap-2">
+                                <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-500/20 text-green-400 text-xs rounded-lg">
+                                    <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
+                                    Live from GitHub API
+                                </span>
+                                <a
+                                    href={`https://github.com/${gitHubUsername}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-xs text-indigo-400 hover:text-indigo-300"
+                                >
+                                    View Profile →
+                                </a>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </Card>
+
             {/* Appearance */}
             <Card padding="lg">
                 <h2 className="text-lg font-semibold text-white mb-6 flex items-center gap-2">
@@ -79,16 +261,16 @@ const SettingsPage = () => {
                     <button
                         onClick={toggleTheme}
                         className={`
-              relative w-14 h-8 rounded-full transition-colors
-              ${isDark ? 'bg-indigo-500' : 'bg-slate-600'}
-            `}
+                            relative w-14 h-8 rounded-full transition-colors
+                            ${isDark ? 'bg-indigo-500' : 'bg-slate-600'}
+                        `}
                     >
                         <div
                             className={`
-                absolute top-1 w-6 h-6 rounded-full bg-white shadow-lg
-                transition-transform
-                ${isDark ? 'left-7' : 'left-1'}
-              `}
+                                absolute top-1 w-6 h-6 rounded-full bg-white shadow-lg
+                                transition-transform
+                                ${isDark ? 'left-7' : 'left-1'}
+                            `}
                         />
                     </button>
                 </div>
@@ -144,3 +326,4 @@ const SettingsPage = () => {
 };
 
 export default SettingsPage;
+

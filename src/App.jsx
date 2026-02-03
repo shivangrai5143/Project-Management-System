@@ -5,9 +5,12 @@ import { ProjectProvider } from './context/ProjectContext';
 import { TaskProvider } from './context/TaskContext';
 import { NotificationProvider } from './context/NotificationContext';
 import { ChatProvider } from './context/ChatContext';
+import { StandupBotProvider } from './context/StandupBotContext';
+import StandupPrompt from './components/standup/StandupPrompt';
 import Layout from './components/layout/Layout';
 import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
+import InvitePage from './pages/InvitePage';
 import DashboardPage from './pages/DashboardPage';
 import ProjectsPage from './pages/ProjectsPage';
 import ProjectDetailPage from './pages/ProjectDetailPage';
@@ -68,6 +71,9 @@ function AppRoutes() {
         </PublicRoute>
       } />
 
+      {/* Invite route - public, no auth required */}
+      <Route path="/invite" element={<InvitePage />} />
+
       {/* Protected routes */}
       <Route path="/" element={
         <ProtectedRoute>
@@ -98,7 +104,10 @@ function App() {
             <TaskProvider>
               <NotificationProvider>
                 <ChatProvider>
-                  <AppRoutes />
+                  <StandupBotProvider>
+                    <AppRoutes />
+                    <StandupPrompt />
+                  </StandupBotProvider>
                 </ChatProvider>
               </NotificationProvider>
             </TaskProvider>

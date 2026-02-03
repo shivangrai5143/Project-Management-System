@@ -1,13 +1,29 @@
+import { useState } from 'react';
 import { useProjects } from '../context/ProjectContext';
+import { useNotifications } from '../context/NotificationContext';
 import Card from '../components/ui/Card';
 import Avatar from '../components/ui/Avatar';
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
-import { Mail, UserPlus } from 'lucide-react';
+import { Mail, UserPlus, Copy, Check } from 'lucide-react';
 import { ROLE_CONFIG } from '../utils/constants';
 
 const TeamPage = () => {
     const { team } = useProjects();
+    const { showToast } = useNotifications();
+    const [copied, setCopied] = useState(false);
+
+    const handleCopyInviteLink = async () => {
+        const inviteLink = `${window.location.origin}/invite`;
+        try {
+            await navigator.clipboard.writeText(inviteLink);
+            setCopied(true);
+            showToast('Invite link copied to clipboard!', 'success');
+            setTimeout(() => setCopied(false), 2000);
+        } catch (err) {
+            showToast('Failed to copy link', 'error');
+        }
+    };
 
     return (
         <div className="space-y-6 animate-fade-in">
@@ -19,8 +35,11 @@ const TeamPage = () => {
                         {team.length} team members
                     </p>
                 </div>
-                <Button icon={UserPlus}>
-                    Invite Member
+                <Button
+                    icon={copied ? Check : UserPlus}
+                    onClick={handleCopyInviteLink}
+                >
+                    {copied ? 'Link Copied!' : 'Copy Invite Link'}
                 </Button>
             </div>
 

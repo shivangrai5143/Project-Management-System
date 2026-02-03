@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect } from 'react';
 import { getItem, setItem, STORAGE_KEYS } from '../utils/storage';
 import { demoTasks } from '../data/mockData';
 import { generateId } from '../utils/helpers';
+import { logActivity, ACTIVITY_TYPES } from '../utils/activityTracker';
 
 const TaskContext = createContext();
 
@@ -36,7 +37,7 @@ export const TaskProvider = ({ children }) => {
         setItem(STORAGE_KEYS.TASKS, newTasks);
     };
 
-    const createTask = (taskData) => {
+    const createTask = (taskData, userId, userName) => {
         const newTask = {
             id: generateId(),
             ...taskData,
@@ -48,6 +49,16 @@ export const TaskProvider = ({ children }) => {
 
         const updatedTasks = [...tasks, newTask];
         saveTasks(updatedTasks);
+
+        // Log activity for standup bot
+        if (userId && userName) {
+            logActivity(userId, userName, ACTIVITY_TYPES.TASK_CREATED, {
+                taskId: newTask.id,
+                taskTitle: newTask.title,
+                projectId: newTask.projectId,
+            });
+        }
+
         return newTask;
     };
 
@@ -83,7 +94,10 @@ export const TaskProvider = ({ children }) => {
         return tasks.filter(task => task.assigneeId === assigneeId);
     };
 
-    const moveTask = (taskId, newStatus, newOrder) => {
+    const moveTask = (taskId, newStatus, newOrder, userId, userName) => {
+        const movedTask = tasks.find(t => t.id === taskId);
+        const oldStatus = movedTask?.status;
+
         const updatedTasks = tasks.map(task => {
             if (task.id === taskId) {
                 return {
@@ -96,6 +110,25 @@ export const TaskProvider = ({ children }) => {
             return task;
         });
         saveTasks(updatedTasks);
+
+        // Log activity for standup bot
+        if (userId && userName && movedTask) {
+            if (newStatus === 'done') {
+                logActivity(userId, userName, ACTIVITY_TYPES.TASK_COMPLETED, {
+                    taskId: movedTask.id,
+                    taskTitle: movedTask.title,
+                    projectId: movedTask.projectId,
+                });
+            } else if (oldStatus !== newStatus) {
+                logActivity(userId, userName, ACTIVITY_TYPES.TASK_MOVED, {
+                    taskId: movedTask.id,
+                    taskTitle: movedTask.title,
+                    projectId: movedTask.projectId,
+                    oldStatus,
+                    newStatus,
+                });
+            }
+        }
     };
 
     const reorderTasks = (projectId, status, orderedIds) => {

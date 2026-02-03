@@ -8,6 +8,9 @@ export const STORAGE_KEYS = {
     THEME: 'pms_theme',
     NOTIFICATIONS: 'pms_notifications',
     CHAT_MESSAGES: 'pms_chat_messages',
+    STANDUP_HISTORY: 'pms_standup_history',
+    STANDUP_SETTINGS: 'pms_standup_settings',
+    ACTIVITY_LOG: 'pms_activity_log',
 };
 
 export const getItem = (key) => {

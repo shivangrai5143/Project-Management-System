@@ -58,7 +58,7 @@ const DashboardPage = () => {
                         Welcome back, {user?.name?.split(' ')[0]} 👋
                     </h1>
                     <p className="text-slate-400 mt-1">
-                       zscdscdsdscsc bhhbhb Here's what's happening with your projects today.
+                     Here's what's happening with your projects today.
                     </p>
                 </div>
                 <Link
