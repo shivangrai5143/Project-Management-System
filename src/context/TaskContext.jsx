@@ -1,0 +1,148 @@
+import { createContext, useContext, useState, useEffect } from 'react';
+import { getItem, setItem, STORAGE_KEYS } from '../utils/storage';
+import { demoTasks } from '../data/mockData';
+import { generateId } from '../utils/helpers';
+
+const TaskContext = createContext();
+
+export const useTasks = () => {
+    const context = useContext(TaskContext);
+    if (!context) {
+        throw new Error('useTasks must be used within a TaskProvider');
+    }
+    return context;
+};
+
+export const TaskProvider = ({ children }) => {
+    const [tasks, setTasks] = useState([]);
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+        // Load tasks from localStorage or use demo data
+        const savedTasks = getItem(STORAGE_KEYS.TASKS);
+
+        if (savedTasks) {
+            setTasks(savedTasks);
+        } else {
+            setTasks(demoTasks);
+            setItem(STORAGE_KEYS.TASKS, demoTasks);
+        }
+
+        setIsLoading(false);
+    }, []);
+
+    const saveTasks = (newTasks) => {
+        setTasks(newTasks);
+        setItem(STORAGE_KEYS.TASKS, newTasks);
+    };
+
+    const createTask = (taskData) => {
+        const newTask = {
+            id: generateId(),
+            ...taskData,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            labels: taskData.labels || [],
+            order: tasks.filter(t => t.projectId === taskData.projectId && t.status === taskData.status).length,
+        };
+
+        const updatedTasks = [...tasks, newTask];
+        saveTasks(updatedTasks);
+        return newTask;
+    };
+
+    const updateTask = (id, updates) => {
+        const updatedTasks = tasks.map(task =>
+            task.id === id
+                ? { ...task, ...updates, updatedAt: new Date().toISOString() }
+                : task
+        );
+        saveTasks(updatedTasks);
+    };
+
+    const deleteTask = (id) => {
+        const updatedTasks = tasks.filter(task => task.id !== id);
+        saveTasks(updatedTasks);
+    };
+
+    const getTask = (id) => {
+        return tasks.find(task => task.id === id);
+    };
+
+    const getTasksByProject = (projectId) => {
+        return tasks.filter(task => task.projectId === projectId);
+    };
+
+    const getTasksByStatus = (projectId, status) => {
+        return tasks
+            .filter(task => task.projectId === projectId && task.status === status)
+            .sort((a, b) => a.order - b.order);
+    };
+
+    const getTasksByAssignee = (assigneeId) => {
+        return tasks.filter(task => task.assigneeId === assigneeId);
+    };
+
+    const moveTask = (taskId, newStatus, newOrder) => {
+        const updatedTasks = tasks.map(task => {
+            if (task.id === taskId) {
+                return {
+                    ...task,
+                    status: newStatus,
+                    order: newOrder,
+                    updatedAt: new Date().toISOString(),
+                };
+            }
+            return task;
+        });
+        saveTasks(updatedTasks);
+    };
+
+    const reorderTasks = (projectId, status, orderedIds) => {
+        const updatedTasks = tasks.map(task => {
+            if (task.projectId === projectId && task.status === status) {
+                const newOrder = orderedIds.indexOf(task.id);
+                return newOrder >= 0 ? { ...task, order: newOrder } : task;
+            }
+            return task;
+        });
+        saveTasks(updatedTasks);
+    };
+
+    const getTaskStats = (projectId) => {
+        const projectTasks = projectId
+            ? tasks.filter(t => t.projectId === projectId)
+            : tasks;
+
+        return {
+            total: projectTasks.length,
+            todo: projectTasks.filter(t => t.status === 'todo').length,
+            inProgress: projectTasks.filter(t => t.status === 'in-progress').length,
+            review: projectTasks.filter(t => t.status === 'review').length,
+            done: projectTasks.filter(t => t.status === 'done').length,
+            overdue: projectTasks.filter(t => {
+                if (!t.dueDate || t.status === 'done') return false;
+                return new Date(t.dueDate) < new Date();
+            }).length,
+        };
+    };
+
+    return (
+        <TaskContext.Provider value={{
+            tasks,
+            isLoading,
+            createTask,
+            updateTask,
+            deleteTask,
+            getTask,
+            getTasksByProject,
+            getTasksByStatus,
+            getTasksByAssignee,
+            moveTask,
+            reorderTasks,
+            getTaskStats,
+        }}>
+            {children}
+        </TaskContext.Provider>
+    );
+};
