@@ -5,13 +5,18 @@ import Card from '../components/ui/Card';
 import Avatar from '../components/ui/Avatar';
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
-import { Mail, UserPlus, Copy, Check } from 'lucide-react';
+import Modal from '../components/ui/Modal';
+import Input from '../components/ui/Input';
+import { Mail, UserPlus, Copy, Check, Send, X } from 'lucide-react';
 import { ROLE_CONFIG } from '../utils/constants';
 
 const TeamPage = () => {
     const { team } = useProjects();
     const { showToast } = useNotifications();
     const [copied, setCopied] = useState(false);
+    const [selectedMember, setSelectedMember] = useState(null);
+    const [emailSubject, setEmailSubject] = useState('');
+    const [emailBody, setEmailBody] = useState('');
 
     const handleCopyInviteLink = async () => {
         const inviteLink = `${window.location.origin}/invite`;
@@ -23,6 +28,37 @@ const TeamPage = () => {
         } catch (err) {
             showToast('Failed to copy link', 'error');
         }
+    };
+
+    const openEmailModal = (member) => {
+        setSelectedMember(member);
+        setEmailSubject('');
+        setEmailBody('');
+    };
+
+    const closeEmailModal = () => {
+        setSelectedMember(null);
+        setEmailSubject('');
+        setEmailBody('');
+    };
+
+    const handleSendEmail = () => {
+        if (!selectedMember) return;
+
+        // Construct mailto link with subject and body
+        const mailtoLink = `mailto:${selectedMember.email}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
+
+        // Open default email client
+        window.location.href = mailtoLink;
+
+        showToast(`Opening email to ${selectedMember.name}`, 'success');
+        closeEmailModal();
+    };
+
+    const handleQuickEmail = (member) => {
+        // Quick email without modal - just opens email client
+        window.location.href = `mailto:${member.email}`;
+        showToast(`Opening email to ${member.name}`, 'success');
     };
 
     return (
@@ -73,6 +109,7 @@ const TeamPage = () => {
                                 size="sm"
                                 icon={Mail}
                                 className="flex-1"
+                                onClick={() => openEmailModal(member)}
                             >
                                 Message
                             </Button>
@@ -80,6 +117,82 @@ const TeamPage = () => {
                     </Card>
                 ))}
             </div>
+
+            {/* Email Compose Modal */}
+            <Modal
+                isOpen={!!selectedMember}
+                onClose={closeEmailModal}
+                title={`Send Email to ${selectedMember?.name || ''}`}
+            >
+                {selectedMember && (
+                    <div className="space-y-4">
+                        {/* Recipient Info */}
+                        <div className="flex items-center gap-3 p-3 bg-slate-800/50 rounded-lg border border-slate-700/50">
+                            <Avatar name={selectedMember.name} size="md" />
+                            <div>
+                                <p className="font-medium text-white">{selectedMember.name}</p>
+                                <p className="text-sm text-slate-400">{selectedMember.email}</p>
+                            </div>
+                        </div>
+
+                        {/* Subject Input */}
+                        <div>
+                            <label className="block text-sm font-medium text-slate-300 mb-2">
+                                Subject
+                            </label>
+                            <Input
+                                type="text"
+                                placeholder="Enter email subject..."
+                                value={emailSubject}
+                                onChange={(e) => setEmailSubject(e.target.value)}
+                            />
+                        </div>
+
+                        {/* Message Body */}
+                        <div>
+                            <label className="block text-sm font-medium text-slate-300 mb-2">
+                                Message
+                            </label>
+                            <textarea
+                                className="w-full px-4 py-3 rounded-xl bg-slate-800/50 border border-slate-700 text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all resize-none"
+                                rows={6}
+                                placeholder="Write your message here..."
+                                value={emailBody}
+                                onChange={(e) => setEmailBody(e.target.value)}
+                            />
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex gap-3 pt-2">
+                            <Button
+                                variant="ghost"
+                                className="flex-1"
+                                onClick={closeEmailModal}
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                variant="primary"
+                                icon={Send}
+                                className="flex-1"
+                                onClick={handleSendEmail}
+                            >
+                                Send Email
+                            </Button>
+                        </div>
+
+                        {/* Quick Send Option */}
+                        <div className="pt-2 border-t border-slate-700/50">
+                            <button
+                                className="text-sm text-indigo-400 hover:text-indigo-300 transition-colors"
+                                onClick={() => handleQuickEmail(selectedMember)}
+                            >
+                                Or click here to open email client directly →
+                            </button>
+                        </div>
+                    </div>
+                )}
+            </Modal>
         </div>
     );
 };

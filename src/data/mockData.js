@@ -5,7 +5,7 @@ export const demoUsers = [
     {
         id: 'user-1',
         name: 'Shivang Rai',
-        email: 'shivang123@gmail.com',
+        email: 'shivang69@gmail.com',
         password: 'password123',
         avatar: null,
         role: 'owner',
