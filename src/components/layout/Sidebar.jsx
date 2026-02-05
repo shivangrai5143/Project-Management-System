@@ -45,7 +45,7 @@ const Sidebar = () => {
                     </div>
                     {!isCollapsed && (
                         <span className="text-xl font-bold bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
-                            ProManager
+                            YojnaFlow
                         </span>
                     )}
                 </div>
@@ -86,7 +86,7 @@ const Sidebar = () => {
             {/* User section */}
             <div className="p-4 border-t border-slate-800">
                 <div className={`flex items-center gap-3 ${isCollapsed ? 'justify-center' : ''}`}>
-                    <Avatar name={user?.name} size="md" />
+                    <Avatar name={user?.name} src={user?.avatar} size="md" />
                     {!isCollapsed && (
                         <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium text-white truncate">{user?.name}</p>
