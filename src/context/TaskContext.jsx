@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { getItem, setItem, STORAGE_KEYS } from '../utils/storage';
+import { tasksApi } from '../utils/api';
 import { demoTasks } from '../data/mockData';
 import { generateId } from '../utils/helpers';
 import { logActivity, ACTIVITY_TYPES } from '../utils/activityTracker';
@@ -14,22 +15,40 @@ export const useTasks = () => {
     return context;
 };
 
+// Check if we should use API or localStorage fallback
+const USE_API = false; // Set to true when backend is deployed
+
 export const TaskProvider = ({ children }) => {
     const [tasks, setTasks] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
-        // Load tasks from localStorage or use demo data
-        const savedTasks = getItem(STORAGE_KEYS.TASKS);
+        const loadTasks = async () => {
+            if (USE_API) {
+                try {
+                    const data = await tasksApi.getMyTasks();
+                    setTasks(data.tasks);
+                } catch (err) {
+                    console.error('Failed to load tasks from API:', err);
+                    loadFromLocalStorage();
+                }
+            } else {
+                loadFromLocalStorage();
+            }
+            setIsLoading(false);
+        };
 
-        if (savedTasks) {
-            setTasks(savedTasks);
-        } else {
-            setTasks(demoTasks);
-            setItem(STORAGE_KEYS.TASKS, demoTasks);
-        }
+        const loadFromLocalStorage = () => {
+            const savedTasks = getItem(STORAGE_KEYS.TASKS);
+            if (savedTasks) {
+                setTasks(savedTasks);
+            } else {
+                setTasks(demoTasks);
+                setItem(STORAGE_KEYS.TASKS, demoTasks);
+            }
+        };
 
-        setIsLoading(false);
+        loadTasks();
     }, []);
 
     const saveTasks = (newTasks) => {
@@ -37,32 +56,62 @@ export const TaskProvider = ({ children }) => {
         setItem(STORAGE_KEYS.TASKS, newTasks);
     };
 
-    const createTask = (taskData, userId, userName) => {
-        const newTask = {
-            id: generateId(),
-            ...taskData,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            labels: taskData.labels || [],
-            order: tasks.filter(t => t.projectId === taskData.projectId && t.status === taskData.status).length,
-        };
+    const createTask = async (taskData, userId, userName) => {
+        if (USE_API) {
+            try {
+                const data = await tasksApi.create(taskData);
+                const newTask = data.task;
+                setTasks(prev => [...prev, newTask]);
 
-        const updatedTasks = [...tasks, newTask];
-        saveTasks(updatedTasks);
+                // Log activity for standup bot
+                if (userId && userName) {
+                    logActivity(userId, userName, ACTIVITY_TYPES.TASK_CREATED, {
+                        taskId: newTask.id || newTask._id,
+                        taskTitle: newTask.title,
+                        projectId: newTask.projectId,
+                    });
+                }
 
-        // Log activity for standup bot
-        if (userId && userName) {
-            logActivity(userId, userName, ACTIVITY_TYPES.TASK_CREATED, {
-                taskId: newTask.id,
-                taskTitle: newTask.title,
-                projectId: newTask.projectId,
-            });
+                return newTask;
+            } catch (err) {
+                console.error('Failed to create task:', err);
+                throw err;
+            }
+        } else {
+            const newTask = {
+                id: generateId(),
+                ...taskData,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+                labels: taskData.labels || [],
+                order: tasks.filter(t => t.projectId === taskData.projectId && t.status === taskData.status).length,
+            };
+
+            const updatedTasks = [...tasks, newTask];
+            saveTasks(updatedTasks);
+
+            // Log activity for standup bot
+            if (userId && userName) {
+                logActivity(userId, userName, ACTIVITY_TYPES.TASK_CREATED, {
+                    taskId: newTask.id,
+                    taskTitle: newTask.title,
+                    projectId: newTask.projectId,
+                });
+            }
+
+            return newTask;
         }
-
-        return newTask;
     };
 
-    const updateTask = (id, updates) => {
+    const updateTask = async (id, updates) => {
+        if (USE_API) {
+            try {
+                await tasksApi.update(id, updates);
+            } catch (err) {
+                console.error('Failed to update task:', err);
+            }
+        }
+
         const updatedTasks = tasks.map(task =>
             task.id === id
                 ? { ...task, ...updates, updatedAt: new Date().toISOString() }
@@ -94,9 +143,17 @@ export const TaskProvider = ({ children }) => {
         return tasks.filter(task => task.assigneeId === assigneeId);
     };
 
-    const moveTask = (taskId, newStatus, newOrder, userId, userName) => {
+    const moveTask = async (taskId, newStatus, newOrder, userId, userName) => {
         const movedTask = tasks.find(t => t.id === taskId);
         const oldStatus = movedTask?.status;
+
+        if (USE_API) {
+            try {
+                await tasksApi.moveTask(taskId, newStatus, newOrder);
+            } catch (err) {
+                console.error('Failed to move task:', err);
+            }
+        }
 
         const updatedTasks = tasks.map(task => {
             if (task.id === taskId) {

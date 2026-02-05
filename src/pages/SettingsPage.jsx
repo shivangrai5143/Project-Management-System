@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useStandupBot } from '../context/StandupBotContext';
@@ -6,26 +6,60 @@ import Card from '../components/ui/Card';
 import Input from '../components/ui/Input';
 import Button from '../components/ui/Button';
 import Avatar from '../components/ui/Avatar';
-import { User, Mail, Lock, Bell, Palette, Save, Bot, Clock, Github, Sparkles } from 'lucide-react';
+import { User, Mail, Lock, Bell, Palette, Save, Bot, Clock, Github, Sparkles, Camera } from 'lucide-react';
 import { connectGitHub, disconnectGitHub, isGitHubConnected, getGitHubUsername } from '../utils/githubSimulator';
+
+const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB
 
 const SettingsPage = () => {
     const { user, updateProfile } = useAuth();
     const { isDark, toggleTheme } = useTheme();
     const { settings, updateSettings, triggerStandup } = useStandupBot();
+    const fileInputRef = useRef(null);
 
     const [formData, setFormData] = useState({
         name: user?.name || '',
         email: user?.email || '',
     });
+    const [avatarPreview, setAvatarPreview] = useState(user?.avatar || null);
+    const [avatarError, setAvatarError] = useState(null);
     const [isSaving, setIsSaving] = useState(false);
     const [gitHubConnected, setGitHubConnected] = useState(isGitHubConnected());
     const [gitHubUsername, setGitHubUsername] = useState(getGitHubUsername());
 
+    const handleAvatarChange = (e) => {
+        const file = e.target.files?.[0];
+        setAvatarError(null);
+
+        if (!file) return;
+
+        // Validate file type
+        if (!file.type.startsWith('image/')) {
+            setAvatarError('Please select an image file (JPG, PNG, or WebP)');
+            return;
+        }
+
+        // Validate file size
+        if (file.size > MAX_FILE_SIZE) {
+            setAvatarError('Image must be less than 2MB');
+            return;
+        }
+
+        // Read file and create base64 preview
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            setAvatarPreview(event.target.result);
+        };
+        reader.onerror = () => {
+            setAvatarError('Failed to read file. Please try again.');
+        };
+        reader.readAsDataURL(file);
+    };
+
     const handleSave = async () => {
         setIsSaving(true);
         await new Promise(resolve => setTimeout(resolve, 500));
-        updateProfile(formData);
+        updateProfile({ ...formData, avatar: avatarPreview });
         setIsSaving(false);
     };
 
@@ -58,10 +92,27 @@ const SettingsPage = () => {
 
                 <div className="flex flex-col md:flex-row gap-6">
                     <div className="flex flex-col items-center gap-4">
-                        <Avatar name={user?.name} size="xl" />
-                        <Button variant="outline" size="sm">
+                        <Avatar name={user?.name} src={avatarPreview} size="xl" />
+                        <input
+                            type="file"
+                            ref={fileInputRef}
+                            onChange={handleAvatarChange}
+                            accept="image/*"
+                            className="hidden"
+                        />
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            icon={Camera}
+                            onClick={() => fileInputRef.current?.click()}
+                        >
                             Change Avatar
                         </Button>
+                        {avatarError && (
+                            <p className="text-xs text-red-400 text-center max-w-[150px]">
+                                {avatarError}
+                            </p>
+                        )}
                     </div>
 
                     <div className="flex-1 space-y-4">

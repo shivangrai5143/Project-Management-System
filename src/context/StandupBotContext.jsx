@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { getItem, setItem, STORAGE_KEYS } from '../utils/storage';
+import { standupsApi } from '../utils/api';
 import { generateId } from '../utils/helpers';
 import {
     getYesterdayActivities,
@@ -27,12 +28,15 @@ export const useStandupBot = () => {
 const DEFAULT_SETTINGS = {
     enabled: true,
     standupTime: '09:00',
-    enabledProjects: [], // Empty means all projects
+    enabledProjects: [],
     gitHubConnected: false,
     showGitHubSuggestions: true,
     autoSuggest: true,
-    snoozeDuration: 30, // minutes
+    snoozeDuration: 30,
 };
+
+// Check if we should use API or localStorage fallback
+const USE_API = false; // Set to true when backend is deployed
 
 export const StandupBotProvider = ({ children }) => {
     const [settings, setSettings] = useState(DEFAULT_SETTINGS);
@@ -142,7 +146,7 @@ export const StandupBotProvider = ({ children }) => {
     }, [generateStandupSuggestions, lastTriggeredDate, snoozedUntil]);
 
     // Submit standup response
-    const submitStandupResponse = useCallback((userId, userName, response, selectedSuggestions = []) => {
+    const submitStandupResponse = useCallback(async (userId, userName, response, selectedSuggestions = []) => {
         const standupEntry = {
             id: generateId(),
             userId,
@@ -153,6 +157,16 @@ export const StandupBotProvider = ({ children }) => {
             suggestions: currentSuggestions,
         };
 
+        // Try to save to API if enabled
+        if (USE_API) {
+            try {
+                await standupsApi.submit(response, selectedSuggestions, currentSuggestions);
+            } catch (err) {
+                console.error('Failed to save standup to API:', err);
+            }
+        }
+
+        // Always save to local history
         const newHistory = [...standupHistory, standupEntry];
         saveHistory(newHistory);
         setIsStandupActive(false);
