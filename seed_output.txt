@@ -1,0 +1,36 @@
+﻿≡ƒöî Connecting to MongoDB...
+Γ£à Connected to MongoDB
+≡ƒùæ∩╕Å  Clearing existing data...
+≡ƒæÑ Creating users...
+   Γ£ô Created user: Shivang Rai
+   Γ£ô Created user: Anuj Yadav
+   Γ£ô Created user: Vivek Yadav
+   Γ£ô Created user: Sachin Singh
+   Γ£ô Created user: Suraj Maurya
+≡ƒôü Creating projects...
+   Γ£ô Created project: Website Redesign
+   Γ£ô Created project: Mobile App Development
+   Γ£ô Created project: Marketing Campaign
+≡ƒôï Creating tasks...
+   Γ£ô Created task: Design homepage mockup
+   Γ£ô Created task: Implement responsive navigation
+   Γ£ô Created task: Set up API endpoints
+   Γ£ô Created task: Write content for About page
+   Γ£ô Created task: Set up React Native project
+   Γ£ô Created task: Design app UI/UX
+   Γ£ô Created task: Implement authentication flow
+   Γ£ô Created task: Define campaign objectives
+   Γ£ô Created task: Create social media content calendar
+   Γ£ô Created task: Design promotional banners
+
+≡ƒÄë Database seeded successfully!
+
+≡ƒôè Summary:
+   ΓÇó Users: 5
+   ΓÇó Projects: 3
+   ΓÇó Tasks: 10
+
+≡ƒæë You can now view this data in MongoDB Compass!
+   Connection: mongodb://localhost:27017/project-management
+
+≡ƒöî Disconnected from MongoDB

@@ -1,13 +1,25 @@
 import { generateId } from '../utils/helpers';
 
+const AVATAR_STYLE = 'dicebear-bottts';  // Options: 'initials', 'dicebear-avataaars', 'dicebear-bottts', 'dicebear-pixel', 'dicebear-lorelei'
+
+const avatarGenerators = {
+    initials: (name) => `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random&color=fff&size=128&bold=true`,
+    'dicebear-avataaars': (name) => `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(name)}`,
+    'dicebear-bottts': (name) => `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(name)}`,
+    'dicebear-pixel': (name) => `https://api.dicebear.com/7.x/pixel-art/svg?seed=${encodeURIComponent(name)}`,
+    'dicebear-lorelei': (name) => `https://api.dicebear.com/7.x/lorelei/svg?seed=${encodeURIComponent(name)}`,
+};
+
+const getUserAvatar = (name) => avatarGenerators[AVATAR_STYLE](name);
+
 // Demo users
 export const demoUsers = [
     {
         id: 'user-1',
         name: 'Shivang Rai',
-        email: 'shivang69@gmail.com',
+        email: 'raishivang69@gmail.com',
         password: 'password123',
-        avatar: null,
+        avatar: getUserAvatar('Shivang Rai'),
         role: 'owner',
     },
     {
@@ -15,7 +27,7 @@ export const demoUsers = [
         name: 'Anuj Yadav',
         email: 'anujyad12@gmail.com',
         password: 'password123',
-        avatar: null,
+        avatar: getUserAvatar('Anuj Yadav'),
         role: 'admin',
     },
     {
@@ -23,7 +35,7 @@ export const demoUsers = [
         name: 'Vivek Yadav',
         email: 'vivek123@gmail.com',
         password: 'password123',
-        avatar: null,
+        avatar: getUserAvatar('Vivek Yadav'),
         role: 'member',
     },
     {
@@ -31,15 +43,15 @@ export const demoUsers = [
         name: 'Sachin Singh',
         email: 'sachin198@gmail.com',
         password: 'password123',
-        avatar: null,
+        avatar: getUserAvatar('Sachin Singh'),
         role: 'member',
     },
     {
-        id: 'user-4',
+        id: 'user-5',
         name: 'Suraj Maurya',
         email: 'suraj8@gmail.com',
         password: 'password123',
-        avatar: null,
+        avatar: getUserAvatar('Suraj Maurya'),
         role: 'member',
     },
 ];
