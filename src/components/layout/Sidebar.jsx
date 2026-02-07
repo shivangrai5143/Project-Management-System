@@ -9,14 +9,17 @@ import {
     ChevronRight,
     LogOut,
     Sparkles,
+    Bot,
 } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { useAIAgent } from '../../context/AIAgentContext';
 import Avatar from '../ui/Avatar';
 
 const Sidebar = () => {
     const [isCollapsed, setIsCollapsed] = useState(false);
     const { user, logout } = useAuth();
+    const { openPanel } = useAIAgent();
     const location = useLocation();
 
     const navItems = [
@@ -81,6 +84,23 @@ const Sidebar = () => {
                         {!isCollapsed && <span className="font-medium">{item.label}</span>}
                     </NavLink>
                 ))}
+
+                {/* AI Assistant Button */}
+                <button
+                    onClick={() => openPanel()}
+                    className={`
+                        w-full flex items-center gap-3 px-3 py-2.5 rounded-xl
+                        transition-all duration-200
+                        bg-gradient-to-r from-indigo-500/10 to-purple-500/10
+                        text-indigo-400 hover:text-white hover:from-indigo-500/20 hover:to-purple-500/20
+                        border border-indigo-500/20 hover:border-indigo-500/40
+                        ${isCollapsed ? 'justify-center' : ''}
+                    `}
+                    title="AI Assistant"
+                >
+                    <Bot className="w-5 h-5 flex-shrink-0" />
+                    {!isCollapsed && <span className="font-medium">ERA ⚡</span>}
+                </button>
             </nav>
 
             {/* User section */}

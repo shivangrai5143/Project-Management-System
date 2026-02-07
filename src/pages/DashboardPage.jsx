@@ -15,6 +15,7 @@ import StatsCard from '../components/dashboard/StatsCard';
 import ProjectCard from '../components/projects/ProjectCard';
 import Avatar from '../components/ui/Avatar';
 import Badge from '../components/ui/Badge';
+import AIInsightsCard from '../components/ai/AIInsightsCard';
 import { getRelativeTime, isOverdue, isDueSoon, formatDate } from '../utils/helpers';
 import { demoActivities } from '../data/mockData';
 import { STATUS_CONFIG, PRIORITY_CONFIG } from '../utils/constants';
@@ -58,7 +59,7 @@ const DashboardPage = () => {
                         Welcome back, {user?.name?.split(' ')[0]} 👋
                     </h1>
                     <p className="text-slate-400 mt-1">
-                     Here's what's happening with your projects today.
+                        Here's what's happening with your projects today.
                     </p>
                 </div>
                 <Link
@@ -185,6 +186,11 @@ const DashboardPage = () => {
                         })}
                     </div>
                 </Card>
+            </div>
+
+            {/* AI Insights */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <AIInsightsCard />
             </div>
 
             {/* Projects section */}

@@ -6,7 +6,9 @@ import { TaskProvider } from './context/TaskContext';
 import { NotificationProvider } from './context/NotificationContext';
 import { ChatProvider } from './context/ChatContext';
 import { StandupBotProvider } from './context/StandupBotContext';
+import { AIAgentProvider } from './context/AIAgentContext';
 import StandupPrompt from './components/standup/StandupPrompt';
+import AIAgentPanel from './components/ai/AIAgentPanel';
 import Layout from './components/layout/Layout';
 import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
@@ -105,8 +107,11 @@ function App() {
               <NotificationProvider>
                 <ChatProvider>
                   <StandupBotProvider>
-                    <AppRoutes />
-                    <StandupPrompt />
+                    <AIAgentProvider>
+                      <AppRoutes />
+                      <StandupPrompt />
+                      <AIAgentPanel />
+                    </AIAgentProvider>
                   </StandupBotProvider>
                 </ChatProvider>
               </NotificationProvider>

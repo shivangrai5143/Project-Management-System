@@ -12,6 +12,11 @@ import {
     Trash2,
     UserPlus,
     MessageCircle,
+    CheckSquare,
+    Circle,
+    ChevronLeft,
+    ChevronRight,
+    Clock,
 } from 'lucide-react';
 import { useProjects } from '../context/ProjectContext';
 import { useTasks } from '../context/TaskContext';
@@ -24,8 +29,293 @@ import Avatar from '../components/ui/Avatar';
 import Badge from '../components/ui/Badge';
 import ProgressBar from '../components/ui/ProgressBar';
 import { Dropdown, DropdownItem, DropdownDivider } from '../components/ui/Dropdown';
-import { calculateProgress, formatDate } from '../utils/helpers';
+import { calculateProgress, formatDate, isOverdue, isDueSoon, getRelativeTime } from '../utils/helpers';
 import ChatPanel from '../components/chat/ChatPanel';
+import { PRIORITY_CONFIG, STATUS_CONFIG } from '../utils/constants';
+
+// List View Component
+const ListView = ({ tasks, team }) => {
+    const [sortBy, setSortBy] = useState('status');
+    const [filterStatus, setFilterStatus] = useState('all');
+
+    const getAssignee = (assigneeId) => team.find(m => m.id === assigneeId);
+
+    const filteredTasks = filterStatus === 'all'
+        ? tasks
+        : tasks.filter(t => t.status === filterStatus);
+
+    const sortedTasks = [...filteredTasks].sort((a, b) => {
+        if (sortBy === 'status') {
+            const order = ['todo', 'in-progress', 'review', 'done'];
+            return order.indexOf(a.status) - order.indexOf(b.status);
+        }
+        if (sortBy === 'priority') {
+            const order = ['high', 'medium', 'low'];
+            return order.indexOf(a.priority) - order.indexOf(b.priority);
+        }
+        if (sortBy === 'dueDate') {
+            return new Date(a.dueDate || '9999') - new Date(b.dueDate || '9999');
+        }
+        return 0;
+    });
+
+    return (
+        <div className="space-y-4">
+            {/* Filters */}
+            <div className="flex flex-wrap items-center gap-4">
+                <div className="flex items-center gap-2">
+                    <span className="text-sm text-slate-400">Sort by:</span>
+                    <select
+                        value={sortBy}
+                        onChange={(e) => setSortBy(e.target.value)}
+                        className="px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                        <option value="status">Status</option>
+                        <option value="priority">Priority</option>
+                        <option value="dueDate">Due Date</option>
+                    </select>
+                </div>
+                <div className="flex items-center gap-2">
+                    <span className="text-sm text-slate-400">Filter:</span>
+                    <select
+                        value={filterStatus}
+                        onChange={(e) => setFilterStatus(e.target.value)}
+                        className="px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                        <option value="all">All Tasks</option>
+                        <option value="todo">To Do</option>
+                        <option value="in-progress">In Progress</option>
+                        <option value="review">In Review</option>
+                        <option value="done">Completed</option>
+                    </select>
+                </div>
+                <span className="text-sm text-slate-500">{sortedTasks.length} tasks</span>
+            </div>
+
+            {/* Task List */}
+            <div className="bg-slate-800/50 rounded-xl border border-slate-700 overflow-hidden">
+                {/* Header */}
+                <div className="grid grid-cols-12 gap-4 px-4 py-3 bg-slate-800 border-b border-slate-700 text-sm font-medium text-slate-400">
+                    <div className="col-span-5">Task</div>
+                    <div className="col-span-2">Status</div>
+                    <div className="col-span-2">Priority</div>
+                    <div className="col-span-2">Assignee</div>
+                    <div className="col-span-1">Due</div>
+                </div>
+
+                {/* Rows */}
+                <div className="divide-y divide-slate-700/50">
+                    {sortedTasks.length > 0 ? (
+                        sortedTasks.map(task => {
+                            const assignee = getAssignee(task.assigneeId);
+                            const statusConfig = STATUS_CONFIG[task.status] || STATUS_CONFIG.todo;
+                            const priorityConfig = PRIORITY_CONFIG[task.priority] || PRIORITY_CONFIG.medium;
+
+                            return (
+                                <div key={task.id} className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-slate-700/30 transition-colors items-center">
+                                    <div className="col-span-5 flex items-center gap-3">
+                                        {task.status === 'done' ? (
+                                            <CheckSquare className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                                        ) : (
+                                            <Circle className="w-4 h-4 text-slate-500 flex-shrink-0" />
+                                        )}
+                                        <span className={`text-sm truncate ${task.status === 'done' ? 'text-slate-400 line-through' : 'text-white'}`}>
+                                            {task.title}
+                                        </span>
+                                    </div>
+                                    <div className="col-span-2">
+                                        <Badge variant={statusConfig.variant || 'default'} size="sm">
+                                            {statusConfig.label}
+                                        </Badge>
+                                    </div>
+                                    <div className="col-span-2">
+                                        <Badge variant={priorityConfig.variant || 'default'} size="sm">
+                                            {priorityConfig.label}
+                                        </Badge>
+                                    </div>
+                                    <div className="col-span-2">
+                                        {assignee ? (
+                                            <div className="flex items-center gap-2">
+                                                <Avatar name={assignee.name} size="xs" />
+                                                <span className="text-sm text-slate-300 truncate">{assignee.name.split(' ')[0]}</span>
+                                            </div>
+                                        ) : (
+                                            <span className="text-sm text-slate-500">Unassigned</span>
+                                        )}
+                                    </div>
+                                    <div className="col-span-1">
+                                        {task.dueDate ? (
+                                            <span className={`text-xs ${isOverdue(task.dueDate) && task.status !== 'done' ? 'text-red-400' :
+                                                    isDueSoon(task.dueDate) && task.status !== 'done' ? 'text-amber-400' :
+                                                        'text-slate-400'
+                                                }`}>
+                                                {formatDate(task.dueDate)}
+                                            </span>
+                                        ) : (
+                                            <span className="text-xs text-slate-500">—</span>
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })
+                    ) : (
+                        <div className="text-center py-8 text-slate-400">
+                            No tasks found
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// Calendar View Component
+const CalendarView = ({ tasks }) => {
+    const [currentMonth, setCurrentMonth] = useState(new Date());
+
+    const getDaysInMonth = (date) => {
+        const year = date.getFullYear();
+        const month = date.getMonth();
+        const firstDay = new Date(year, month, 1);
+        const lastDay = new Date(year, month + 1, 0);
+        const days = [];
+
+        for (let i = 0; i < firstDay.getDay(); i++) {
+            days.push(null);
+        }
+
+        for (let i = 1; i <= lastDay.getDate(); i++) {
+            days.push(new Date(year, month, i));
+        }
+
+        return days;
+    };
+
+    const days = getDaysInMonth(currentMonth);
+    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+        'July', 'August', 'September', 'October', 'November', 'December'];
+
+    const getTasksForDay = (day) => {
+        if (!day) return [];
+        return tasks.filter(t => {
+            if (!t.dueDate) return false;
+            const dueDate = new Date(t.dueDate);
+            return dueDate.getDate() === day.getDate() &&
+                dueDate.getMonth() === day.getMonth() &&
+                dueDate.getFullYear() === day.getFullYear();
+        });
+    };
+
+    const isToday = (day) => {
+        if (!day) return false;
+        const today = new Date();
+        return day.getDate() === today.getDate() &&
+            day.getMonth() === today.getMonth() &&
+            day.getFullYear() === today.getFullYear();
+    };
+
+    return (
+        <div className="space-y-4">
+            {/* Calendar Header */}
+            <div className="flex items-center justify-between">
+                <button
+                    onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1))}
+                    className="p-2 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
+                >
+                    <ChevronLeft className="w-5 h-5" />
+                </button>
+                <h3 className="text-xl font-semibold text-white">
+                    {monthNames[currentMonth.getMonth()]} {currentMonth.getFullYear()}
+                </h3>
+                <button
+                    onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1))}
+                    className="p-2 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
+                >
+                    <ChevronRight className="w-5 h-5" />
+                </button>
+            </div>
+
+            {/* Calendar Grid */}
+            <div className="bg-slate-800/50 rounded-xl border border-slate-700 overflow-hidden">
+                {/* Day headers */}
+                <div className="grid grid-cols-7 border-b border-slate-700">
+                    {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map(day => (
+                        <div key={day} className="p-3 text-center text-sm font-medium text-slate-400 border-r border-slate-700/50 last:border-r-0">
+                            <span className="hidden sm:inline">{day}</span>
+                            <span className="sm:hidden">{day.slice(0, 3)}</span>
+                        </div>
+                    ))}
+                </div>
+
+                {/* Calendar days */}
+                <div className="grid grid-cols-7">
+                    {days.map((day, i) => {
+                        const dayTasks = getTasksForDay(day);
+
+                        return (
+                            <div
+                                key={i}
+                                className={`min-h-[100px] p-2 border-b border-r border-slate-700/50 last:border-r-0 ${day ? 'bg-slate-800/30' : 'bg-slate-900/30'
+                                    } ${isToday(day) ? 'bg-indigo-500/10 ring-1 ring-indigo-500/30 ring-inset' : ''}`}
+                            >
+                                {day && (
+                                    <>
+                                        <div className={`text-sm font-medium mb-2 ${isToday(day) ? 'text-indigo-400' : 'text-slate-400'
+                                            }`}>
+                                            {day.getDate()}
+                                        </div>
+                                        {dayTasks.length > 0 && (
+                                            <div className="space-y-1">
+                                                {dayTasks.slice(0, 3).map(task => (
+                                                    <div
+                                                        key={task.id}
+                                                        className={`text-xs px-2 py-1 rounded truncate ${task.status === 'done' ? 'bg-emerald-500/20 text-emerald-400' :
+                                                                isOverdue(task.dueDate) ? 'bg-red-500/20 text-red-400' :
+                                                                    task.priority === 'high' ? 'bg-orange-500/20 text-orange-400' :
+                                                                        'bg-indigo-500/20 text-indigo-400'
+                                                            }`}
+                                                        title={task.title}
+                                                    >
+                                                        {task.title}
+                                                    </div>
+                                                ))}
+                                                {dayTasks.length > 3 && (
+                                                    <div className="text-xs text-slate-500 px-2">
+                                                        +{dayTasks.length - 3} more
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
+
+            {/* Legend */}
+            <div className="flex flex-wrap items-center gap-4 text-xs text-slate-400">
+                <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded bg-indigo-500/40" />
+                    <span>Scheduled</span>
+                </div>
+                <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded bg-orange-500/40" />
+                    <span>High Priority</span>
+                </div>
+                <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded bg-red-500/40" />
+                    <span>Overdue</span>
+                </div>
+                <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded bg-emerald-500/40" />
+                    <span>Completed</span>
+                </div>
+            </div>
+        </div>
+    );
+};
 
 const ProjectDetailPage = () => {
     const { projectId } = useParams();
@@ -218,15 +508,11 @@ const ProjectDetailPage = () => {
             )}
 
             {activeTab === 'list' && (
-                <div className="text-center py-12 text-slate-400">
-                    List view coming soon...
-                </div>
+                <ListView tasks={tasks} team={team} />
             )}
 
             {activeTab === 'calendar' && (
-                <div className="text-center py-12 text-slate-400">
-                    Calendar view coming soon...
-                </div>
+                <CalendarView tasks={tasks} />
             )}
 
             {/* Edit Modal */}
