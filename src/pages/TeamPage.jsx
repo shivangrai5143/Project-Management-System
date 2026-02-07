@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useProjects } from '../context/ProjectContext';
 import { useNotifications } from '../context/NotificationContext';
 import Card from '../components/ui/Card';
@@ -7,16 +7,25 @@ import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
 import Modal from '../components/ui/Modal';
 import Input from '../components/ui/Input';
-import { Mail, UserPlus, Copy, Check, Send, X } from 'lucide-react';
+import { Mail, UserPlus, Copy, Check, Send, X, Camera, Save } from 'lucide-react';
 import { ROLE_CONFIG } from '../utils/constants';
+import { usersApi } from '../utils/api';
 
 const TeamPage = () => {
-    const { team } = useProjects();
+    const { team, updateTeamMember } = useProjects();
     const { showToast } = useNotifications();
     const [copied, setCopied] = useState(false);
     const [selectedMember, setSelectedMember] = useState(null);
     const [emailSubject, setEmailSubject] = useState('');
     const [emailBody, setEmailBody] = useState('');
+
+    // Avatar editing state
+    const [avatarMember, setAvatarMember] = useState(null);
+    const [avatarPreview, setAvatarPreview] = useState(null);
+    const [isSavingAvatar, setIsSavingAvatar] = useState(false);
+    const avatarInputRef = useRef(null);
+
+    const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB
 
     const handleCopyInviteLink = async () => {
         const inviteLink = `${window.location.origin}/invite`;
@@ -61,6 +70,60 @@ const TeamPage = () => {
         showToast(`Opening email to ${member.name}`, 'success');
     };
 
+    // Avatar editing functions
+    const openAvatarModal = (member) => {
+        setAvatarMember(member);
+        setAvatarPreview(member.avatar || null);
+    };
+
+    const closeAvatarModal = () => {
+        setAvatarMember(null);
+        setAvatarPreview(null);
+    };
+
+    const handleAvatarFileChange = (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        if (!file.type.startsWith('image/')) {
+            showToast('Please select an image file', 'error');
+            return;
+        }
+
+        if (file.size > MAX_FILE_SIZE) {
+            showToast('Image must be less than 2MB', 'error');
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            setAvatarPreview(event.target.result);
+        };
+        reader.readAsDataURL(file);
+    };
+
+    const handleSaveAvatar = async () => {
+        if (!avatarMember || !avatarPreview) return;
+
+        setIsSavingAvatar(true);
+        try {
+            // Update local team state (saves to localStorage)
+            // API call is skipped for local development
+            // When deployed to Vercel, you can add: await usersApi.updateAvatar(avatarMember.id, avatarPreview);
+            if (updateTeamMember) {
+                updateTeamMember(avatarMember.id, { avatar: avatarPreview });
+            }
+
+            showToast(`Avatar updated for ${avatarMember.name}`, 'success');
+            closeAvatarModal();
+        } catch (error) {
+            showToast('Failed to update avatar', 'error');
+        } finally {
+            setIsSavingAvatar(false);
+        }
+    };
+
+
     return (
         <div className="space-y-6 animate-fade-in">
             {/* Header */}
@@ -84,7 +147,16 @@ const TeamPage = () => {
                 {team.map(member => (
                     <Card key={member.id} className="group" hover>
                         <div className="flex items-start gap-4">
-                            <Avatar name={member.name} size="lg" />
+                            <div className="relative">
+                                <Avatar name={member.name} src={member.avatar} size="lg" />
+                                <button
+                                    onClick={() => openAvatarModal(member)}
+                                    className="absolute -bottom-1 -right-1 w-6 h-6 bg-indigo-500 rounded-full flex items-center justify-center text-white hover:bg-indigo-600 transition-colors shadow-lg"
+                                    title="Change avatar"
+                                >
+                                    <Camera className="w-3 h-3" />
+                                </button>
+                            </div>
 
                             <div className="flex-1 min-w-0">
                                 <h3 className="font-semibold text-white truncate">
@@ -189,6 +261,73 @@ const TeamPage = () => {
                             >
                                 Or click here to open email client directly →
                             </button>
+                        </div>
+                    </div>
+                )}
+            </Modal>
+
+            {/* Avatar Edit Modal */}
+            <Modal
+                isOpen={!!avatarMember}
+                onClose={closeAvatarModal}
+                title={`Change Avatar for ${avatarMember?.name || ''}`}
+            >
+                {avatarMember && (
+                    <div className="space-y-6">
+                        {/* Avatar Preview */}
+                        <div className="flex flex-col items-center gap-4">
+                            <div className="relative">
+                                <Avatar
+                                    name={avatarMember.name}
+                                    src={avatarPreview}
+                                    size="xl"
+                                />
+                            </div>
+                            <p className="text-sm text-slate-400">
+                                {avatarMember.name}
+                            </p>
+                        </div>
+
+                        {/* File Upload */}
+                        <div className="flex flex-col items-center gap-3">
+                            <input
+                                type="file"
+                                ref={avatarInputRef}
+                                onChange={handleAvatarFileChange}
+                                accept="image/*"
+                                className="hidden"
+                            />
+                            <Button
+                                variant="outline"
+                                icon={Camera}
+                                onClick={() => avatarInputRef.current?.click()}
+                            >
+                                Choose Image
+                            </Button>
+                            <p className="text-xs text-slate-500">
+                                Max file size: 2MB. Supported: JPG, PNG, WebP
+                            </p>
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex gap-3 pt-2">
+                            <Button
+                                variant="ghost"
+                                className="flex-1"
+                                onClick={closeAvatarModal}
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                variant="primary"
+                                icon={Save}
+                                className="flex-1"
+                                onClick={handleSaveAvatar}
+                                loading={isSavingAvatar}
+                                disabled={!avatarPreview}
+                            >
+                                Save Avatar
+                            </Button>
                         </div>
                     </div>
                 )}

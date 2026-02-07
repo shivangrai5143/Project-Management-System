@@ -192,5 +192,20 @@ export const tasksApi = {
     },
 };
 
+// ============ USERS API ============
+
+export const usersApi = {
+    async updateAvatar(userId, avatar) {
+        return apiRequest(`/users/${userId}`, {
+            method: 'PATCH',
+            body: { avatar },
+        });
+    },
+
+    async getAll() {
+        return apiRequest('/users');
+    },
+};
+
 export { ApiError };
 export default apiRequest;

@@ -5,8 +5,8 @@ import User from './models/User.js';
 import Project from './models/Project.js';
 import Task from './models/Task.js';
 
-// Local MongoDB connection string
-const MONGODB_URI = 'mongodb://localhost:27017/project-management';
+// MongoDB Atlas connection string
+const MONGODB_URI = 'mongodb+srv://Admin:Shivang%40123@cluster0.b3mtj24.mongodb.net/project-management?retryWrites=true&w=majority';
 
 // Avatar generator
 const AVATAR_STYLE = 'dicebear-bottts';

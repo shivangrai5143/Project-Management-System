@@ -170,6 +170,16 @@ export const ProjectProvider = ({ children }) => {
         return team.find(member => member.id === userId);
     };
 
+    const updateTeamMember = (userId, updates) => {
+        const updatedTeam = team.map(member =>
+            member.id === userId
+                ? { ...member, ...updates }
+                : member
+        );
+        setTeam(updatedTeam);
+        setItem(STORAGE_KEYS.TEAM, updatedTeam);
+    };
+
     return (
         <ProjectContext.Provider value={{
             projects,
@@ -183,6 +193,7 @@ export const ProjectProvider = ({ children }) => {
             addTeamMember,
             removeTeamMember,
             getTeamMember,
+            updateTeamMember,
         }}>
             {children}
         </ProjectContext.Provider>
