@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
     Bot,
     X,
@@ -17,14 +17,20 @@ import {
     Calendar,
     List,
     CheckSquare,
-    Circle
+    Circle,
+    MessageCircle,
+    Send,
+    Pen
 } from 'lucide-react';
 import { useAIAgent } from '../../context/AIAgentContext';
 import { useProjects } from '../../context/ProjectContext';
 import { useTasks } from '../../context/TaskContext';
 import { useAuth } from '../../context/AuthContext';
+import { useChat } from '../../context/ChatContext';
 import Badge from '../ui/Badge';
+import Avatar from '../ui/Avatar';
 import { formatDate, isOverdue, isDueSoon } from '../../utils/helpers';
+import Whiteboard from '../whiteboard/Whiteboard';
 
 // Lists Tab Component
 const ListsTabContent = ({ projects, selectedProject, setSelectedProject }) => {
@@ -262,6 +268,369 @@ const CalendarTabContent = ({ projects, selectedProject, setSelectedProject }) =
     );
 };
 
+// Chat Tab Component
+const ChatTabContent = ({ projects, selectedProject, setSelectedProject }) => {
+    const { getMessagesByProject, sendMessage } = useChat();
+    const { user } = useAuth();
+    const { tasks } = useTasks();
+    const { getRisks, getProjectAnalysis } = useAIAgent();
+    const messagesEndRef = useRef(null);
+    const [inputValue, setInputValue] = useState('');
+    const [isAITyping, setIsAITyping] = useState(false);
+
+    const messages = selectedProject ? getMessagesByProject(selectedProject) : [];
+    const currentProject = projects.find(p => p.id === selectedProject);
+    const teamMembers = currentProject?.teamMembers || [];
+
+    const scrollToBottom = () => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    };
+
+    useEffect(() => {
+        scrollToBottom();
+    }, [messages, isAITyping]);
+
+    // AI Response Generator
+    const generateAIResponse = (userMessage) => {
+        const msg = userMessage.toLowerCase();
+        const projectTasks = tasks.filter(t => t.projectId === selectedProject);
+        const todoTasks = projectTasks.filter(t => t.status === 'todo');
+        const inProgressTasks = projectTasks.filter(t => t.status === 'in-progress');
+        const doneTasks = projectTasks.filter(t => t.status === 'done');
+        const risks = getRisks();
+        const projectRisks = risks.filter(r => r.items?.some(i => projectTasks.find(t => t.id === i.id)));
+
+        // Greeting responses
+        if (msg.match(/^(hi|hello|hey|good morning|good afternoon|good evening)/i)) {
+            const greetings = [
+                `Hello! 👋 I'm ERA, your AI project assistant. How can I help you with ${currentProject?.name || 'your project'} today?`,
+                `Hey there! Ready to help you with ${currentProject?.name || 'your project'}. Ask me about tasks, progress, or team status!`,
+                `Hi! I'm here to help. You can ask me about project status, tasks, risks, or team workload.`
+            ];
+            return greetings[Math.floor(Math.random() * greetings.length)];
+        }
+
+        // Project status
+        if (msg.match(/status|how.*going|overview|summary/i)) {
+            const completionRate = projectTasks.length > 0
+                ? Math.round((doneTasks.length / projectTasks.length) * 100)
+                : 0;
+            return `📊 **${currentProject?.name || 'Project'} Status:**\n\n` +
+                `• **Progress:** ${completionRate}% complete\n` +
+                `• **To Do:** ${todoTasks.length} tasks\n` +
+                `• **In Progress:** ${inProgressTasks.length} tasks\n` +
+                `• **Completed:** ${doneTasks.length} tasks\n\n` +
+                (completionRate >= 80 ? `🎉 Great progress! Almost there!` :
+                    completionRate >= 50 ? `👍 Good momentum! Keep it up!` :
+                        `💪 Let's push forward! Focus on high-priority items.`);
+        }
+
+        // Tasks queries
+        if (msg.match(/task|todo|what.*do|pending|remaining/i)) {
+            if (todoTasks.length === 0 && inProgressTasks.length === 0) {
+                return `✅ Amazing! All tasks are complete for ${currentProject?.name || 'this project'}!`;
+            }
+            let response = `📋 **Current Tasks:**\n\n`;
+            if (inProgressTasks.length > 0) {
+                response += `**In Progress:**\n`;
+                inProgressTasks.slice(0, 3).forEach(t => {
+                    response += `• ${t.title}\n`;
+                });
+                if (inProgressTasks.length > 3) response += `  ...and ${inProgressTasks.length - 3} more\n`;
+                response += `\n`;
+            }
+            if (todoTasks.length > 0) {
+                response += `**To Do:**\n`;
+                todoTasks.slice(0, 3).forEach(t => {
+                    response += `• ${t.title}\n`;
+                });
+                if (todoTasks.length > 3) response += `  ...and ${todoTasks.length - 3} more\n`;
+            }
+            return response;
+        }
+
+        // Risk queries
+        if (msg.match(/risk|issue|problem|blocke|concern|overdue/i)) {
+            if (risks.length === 0) {
+                return `✅ **All Clear!** No major risks detected for your projects. Keep up the great work!`;
+            }
+            let response = `⚠️ **Current Risks:**\n\n`;
+            risks.slice(0, 3).forEach(r => {
+                const emoji = r.severity === 'high' ? '🔴' : r.severity === 'medium' ? '🟡' : '🔵';
+                response += `${emoji} **${r.title}**\n   ${r.description}\n\n`;
+            });
+            if (risks.length > 3) {
+                response += `...and ${risks.length - 3} more risks. Check the Risks tab for details.`;
+            }
+            return response;
+        }
+
+        // Progress queries
+        if (msg.match(/progress|complete|done|finish/i)) {
+            const completionRate = projectTasks.length > 0
+                ? Math.round((doneTasks.length / projectTasks.length) * 100)
+                : 0;
+            return `📈 **Progress Report:**\n\n` +
+                `${currentProject?.name || 'Project'} is **${completionRate}%** complete!\n\n` +
+                `• ✅ ${doneTasks.length} tasks completed\n` +
+                `• 🔄 ${inProgressTasks.length} tasks in progress\n` +
+                `• 📝 ${todoTasks.length} tasks remaining`;
+        }
+
+        // Team queries
+        if (msg.match(/team|member|who|assign/i)) {
+            if (!teamMembers || teamMembers.length === 0) {
+                return `👥 No team members assigned to this project yet. Add team members in the project settings!`;
+            }
+            let response = `👥 **Team Members (${teamMembers.length}):**\n\n`;
+            teamMembers.slice(0, 5).forEach(m => {
+                const memberName = m.name || m;
+                const memberTasks = projectTasks.filter(t => t.assigneeId === (m.id || m));
+                response += `• ${memberName} - ${memberTasks.length} tasks\n`;
+            });
+            if (teamMembers.length > 5) {
+                response += `...and ${teamMembers.length - 5} more members`;
+            }
+            return response;
+        }
+
+        // Help
+        if (msg.match(/help|what can you|how.*use|command/i)) {
+            return `🤖 **I'm ERA, your AI Project Assistant!**\n\n` +
+                `Here's what I can help you with:\n\n` +
+                `📊 **"What's the status?"** - Get project overview\n` +
+                `📋 **"Show tasks"** - See current tasks\n` +
+                `⚠️ **"Any risks?"** - Check for issues\n` +
+                `📈 **"How's progress?"** - View completion stats\n` +
+                `👥 **"Who's on the team?"** - See team members\n\n` +
+                `Just type naturally - I'll understand! 💬`;
+        }
+
+        // Thank you
+        if (msg.match(/thank|thanks|appreciate/i)) {
+            const responses = [
+                `You're welcome! 😊 Let me know if you need anything else!`,
+                `Happy to help! Feel free to ask me anytime! 🚀`,
+                `Anytime! I'm here to make your project management easier! 💪`
+            ];
+            return responses[Math.floor(Math.random() * responses.length)];
+        }
+
+        // Default response
+        const defaultResponses = [
+            `I can help you with project status, tasks, risks, progress, and team info. Try asking "What's the status?" or "Show me the tasks"! 🤖`,
+            `Not sure I understood that. You can ask me about:\n• Project status\n• Current tasks\n• Risks and issues\n• Team workload\n\nHow can I help?`,
+            `I'm ERA, your project assistant! Try asking about your project's status, tasks, or team. Type "help" for more options! 💡`
+        ];
+        return defaultResponses[Math.floor(Math.random() * defaultResponses.length)];
+    };
+
+    const handleSendMessage = () => {
+        if (inputValue.trim() && user && selectedProject) {
+            const userMsg = inputValue.trim();
+            sendMessage(selectedProject, user.id, user.name, userMsg);
+            setInputValue('');
+
+            // Trigger AI response after a short delay
+            setIsAITyping(true);
+            setTimeout(() => {
+                const aiResponse = generateAIResponse(userMsg);
+                sendMessage(selectedProject, 'era-ai', 'ERA ⚡', aiResponse);
+                setIsAITyping(false);
+            }, 1000 + Math.random() * 1000); // 1-2 second delay for natural feel
+        }
+    };
+
+    const handleKeyPress = (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            handleSendMessage();
+        }
+    };
+
+    const formatTime = (dateString) => {
+        const date = new Date(dateString);
+        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    };
+
+    const formatDateHeader = (dateString) => {
+        const date = new Date(dateString);
+        const today = new Date();
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+
+        if (date.toDateString() === today.toDateString()) return 'Today';
+        if (date.toDateString() === yesterday.toDateString()) return 'Yesterday';
+        return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+    };
+
+    return (
+        <div className="flex flex-col h-full" style={{ height: 'calc(100vh - 180px)' }}>
+            {/* Project filter */}
+            <select
+                value={selectedProject}
+                onChange={(e) => setSelectedProject(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-4"
+            >
+                <option value="">Select a project...</option>
+                {projects.map(p => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+            </select>
+
+            {!selectedProject ? (
+                <div className="flex-1 flex flex-col items-center justify-center text-center">
+                    <div className="w-16 h-16 rounded-2xl bg-slate-800/50 flex items-center justify-center mb-4">
+                        <MessageCircle className="w-8 h-8 text-slate-500" />
+                    </div>
+                    <p className="text-slate-400 text-sm">Select a project to start chatting</p>
+                    <p className="text-slate-500 text-xs mt-1">Chat with your team members in real-time</p>
+                </div>
+            ) : (
+                <>
+                    {/* Team Members */}
+                    <div className="px-2 py-3 border-b border-slate-700/50 flex items-center gap-2 mb-3">
+                        <span className="text-xs text-slate-400">Team:</span>
+                        <div className="flex -space-x-2">
+                            {teamMembers?.slice(0, 6).map(member => (
+                                <Avatar
+                                    key={member.id || member}
+                                    name={member.name || member}
+                                    size="xs"
+                                    className="border-2 border-slate-900"
+                                />
+                            ))}
+                            {teamMembers?.length > 6 && (
+                                <div className="w-6 h-6 rounded-full bg-slate-700 border-2 border-slate-900 flex items-center justify-center text-[10px] text-slate-300">
+                                    +{teamMembers.length - 6}
+                                </div>
+                            )}
+                        </div>
+                        {teamMembers?.length === 0 && (
+                            <span className="text-xs text-slate-500">No team members</span>
+                        )}
+                    </div>
+
+                    {/* Messages */}
+                    <div className="flex-1 overflow-y-auto space-y-3 pr-1">
+                        {messages.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center h-full text-center">
+                                <div className="w-16 h-16 rounded-2xl bg-slate-800/50 flex items-center justify-center mb-4">
+                                    <MessageCircle className="w-8 h-8 text-slate-500" />
+                                </div>
+                                <p className="text-slate-400 text-sm">No messages yet</p>
+                                <p className="text-slate-500 text-xs mt-1">Start the conversation with your team!</p>
+                            </div>
+                        ) : (
+                            messages.map((message, index) => {
+                                const isOwnMessage = user?.id === message.userId;
+                                const isAIMessage = message.userId === 'era-ai';
+                                const showDateHeader = index === 0 ||
+                                    new Date(message.createdAt).toDateString() !==
+                                    new Date(messages[index - 1].createdAt).toDateString();
+
+                                // Format message content with basic markdown
+                                const formatContent = (content) => {
+                                    // Convert **bold** to <strong>
+                                    return content.split(/(\*\*[^*]+\*\*)/).map((part, i) => {
+                                        if (part.startsWith('**') && part.endsWith('**')) {
+                                            return <strong key={i} className="font-semibold">{part.slice(2, -2)}</strong>;
+                                        }
+                                        return part;
+                                    });
+                                };
+
+                                return (
+                                    <div key={message.id}>
+                                        {showDateHeader && (
+                                            <div className="flex items-center justify-center my-3">
+                                                <span className="text-xs text-slate-500 bg-slate-800/50 px-3 py-1 rounded-full">
+                                                    {formatDateHeader(message.createdAt)}
+                                                </span>
+                                            </div>
+                                        )}
+                                        <div className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'}`}>
+                                            <div className={`max-w-[80%] ${isOwnMessage ? 'order-2' : 'order-1'}`}>
+                                                {!isOwnMessage && (
+                                                    <div className="flex items-center gap-2 mb-1">
+                                                        {isAIMessage ? (
+                                                            <div className="w-6 h-6 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
+                                                                <Bot className="w-3 h-3 text-white" />
+                                                            </div>
+                                                        ) : (
+                                                            <Avatar name={message.userName} size="xs" />
+                                                        )}
+                                                        <span className={`text-xs ${isAIMessage ? 'text-indigo-400 font-medium' : 'text-slate-400'}`}>
+                                                            {message.userName}
+                                                        </span>
+                                                    </div>
+                                                )}
+                                                <div
+                                                    className={`px-3 py-2 rounded-2xl ${isOwnMessage
+                                                        ? 'bg-indigo-500 text-white rounded-br-md'
+                                                        : isAIMessage
+                                                            ? 'bg-gradient-to-br from-slate-800 to-slate-800/80 text-slate-100 rounded-bl-md border border-indigo-500/20'
+                                                            : 'bg-slate-800 text-slate-100 rounded-bl-md'
+                                                        }`}
+                                                >
+                                                    <p className="text-sm break-words whitespace-pre-line">{formatContent(message.content)}</p>
+                                                </div>
+                                                <p className={`text-xs text-slate-500 mt-1 ${isOwnMessage ? 'text-right' : 'text-left'}`}>
+                                                    {formatTime(message.createdAt)}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })
+                        )}
+                        {/* AI Typing Indicator */}
+                        {isAITyping && (
+                            <div className="flex justify-start">
+                                <div className="max-w-[80%]">
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <div className="w-6 h-6 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
+                                            <Bot className="w-3 h-3 text-white" />
+                                        </div>
+                                        <span className="text-xs text-slate-400">ERA ⚡</span>
+                                    </div>
+                                    <div className="px-3 py-2 rounded-2xl bg-slate-800 text-slate-100 rounded-bl-md">
+                                        <div className="flex items-center gap-1">
+                                            <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                                            <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                                            <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                        <div ref={messagesEndRef} />
+                    </div>
+
+                    {/* Input */}
+                    <div className="mt-4 flex items-center gap-2 p-3 bg-slate-800/50 rounded-xl border border-slate-700">
+                        <input
+                            type="text"
+                            value={inputValue}
+                            onChange={(e) => setInputValue(e.target.value)}
+                            onKeyPress={handleKeyPress}
+                            placeholder="Type a message..."
+                            className="flex-1 bg-transparent text-white placeholder-slate-400 text-sm focus:outline-none"
+                        />
+                        <button
+                            onClick={handleSendMessage}
+                            disabled={!inputValue.trim()}
+                            className="p-2 rounded-lg bg-indigo-500 text-white hover:bg-indigo-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            <Send className="w-4 h-4" />
+                        </button>
+                    </div>
+                </>
+            )}
+        </div>
+    );
+};
+
 
 const AIAgentPanel = () => {
     const { isPanelOpen, closePanel, activeProjectId, getTrends, getRisks, getProjectPlanSuggestions, getProjectAnalysis } = useAIAgent();
@@ -358,6 +727,8 @@ const AIAgentPanel = () => {
                         { id: 'planner', label: 'Planner', icon: ListChecks },
                         { id: 'lists', label: 'Lists', icon: List },
                         { id: 'calendar', label: 'Calendar', icon: Calendar },
+                        { id: 'chat', label: 'Chat', icon: MessageCircle },
+                        { id: 'whiteboard', label: 'Board', icon: Pen },
                     ].map(tab => (
                         <button
                             key={tab.id}
@@ -639,6 +1010,32 @@ const AIAgentPanel = () => {
                             selectedProject={selectedProject}
                             setSelectedProject={setSelectedProject}
                         />
+                    )}
+
+                    {/* Chat Tab */}
+                    {activeTab === 'chat' && (
+                        <ChatTabContent
+                            projects={projects}
+                            selectedProject={selectedProject}
+                            setSelectedProject={setSelectedProject}
+                        />
+                    )}
+
+                    {/* Whiteboard Tab */}
+                    {activeTab === 'whiteboard' && (
+                        <div className="space-y-4">
+                            <select
+                                value={selectedProject}
+                                onChange={(e) => setSelectedProject(e.target.value)}
+                                className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            >
+                                <option value="">Select a project...</option>
+                                {projects.map(p => (
+                                    <option key={p.id} value={p.id}>{p.name}</option>
+                                ))}
+                            </select>
+                            <Whiteboard projectId={selectedProject} />
+                        </div>
                     )}
                 </div>
             </div>

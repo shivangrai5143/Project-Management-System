@@ -11,6 +11,7 @@ export const STORAGE_KEYS = {
     STANDUP_HISTORY: 'pms_standup_history',
     STANDUP_SETTINGS: 'pms_standup_settings',
     ACTIVITY_LOG: 'pms_activity_log',
+    WHITEBOARD_LOCAL: 'pms_whiteboard_local',
 };
 
 export const getItem = (key) => {

@@ -7,6 +7,7 @@ import { NotificationProvider } from './context/NotificationContext';
 import { ChatProvider } from './context/ChatContext';
 import { StandupBotProvider } from './context/StandupBotContext';
 import { AIAgentProvider } from './context/AIAgentContext';
+import { WhiteboardProvider } from './context/WhiteboardContext';
 import StandupPrompt from './components/standup/StandupPrompt';
 import AIAgentPanel from './components/ai/AIAgentPanel';
 import Layout from './components/layout/Layout';
@@ -108,9 +109,11 @@ function App() {
                 <ChatProvider>
                   <StandupBotProvider>
                     <AIAgentProvider>
-                      <AppRoutes />
-                      <StandupPrompt />
-                      <AIAgentPanel />
+                      <WhiteboardProvider>
+                        <AppRoutes />
+                        <StandupPrompt />
+                        <AIAgentPanel />
+                      </WhiteboardProvider>
                     </AIAgentProvider>
                   </StandupBotProvider>
                 </ChatProvider>
