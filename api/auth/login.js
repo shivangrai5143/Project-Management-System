@@ -1,6 +1,4 @@
-import connectDB from '../lib/mongodb.js';
-import User from '../models/User.js';
-import { signToken, jsonResponse, errorResponse } from '../lib/auth.js';
+import { jsonResponse, errorResponse } from '../lib/auth.js';
 
 export default async function handler(req, res) {
     // Only allow POST
@@ -9,41 +7,13 @@ export default async function handler(req, res) {
     }
 
     try {
-        await connectDB();
+        // Firebase Auth login is handled entirely on the client side
+        // using signInWithEmailAndPassword from Firebase SDK
+        // This endpoint can be kept for backward compatibility or removed
 
-        const { email, password } = req.body;
-
-        // Validate input
-        if (!email || !password) {
-            return errorResponse(res, 'Please provide email and password');
-        }
-
-        // Find user by email (include password for comparison)
-        const user = await User.findOne({ email: email.toLowerCase() }).select('+password');
-
-        if (!user) {
-            return errorResponse(res, 'Invalid email or password', 401);
-        }
-
-        // Check password
-        const isMatch = await user.comparePassword(password);
-
-        if (!isMatch) {
-            return errorResponse(res, 'Invalid email or password', 401);
-        }
-
-        // Generate JWT token
-        const token = signToken({
-            id: user._id,
-            email: user.email,
-            name: user.name,
-        });
-
-        // Return user data and token
         return jsonResponse(res, {
             success: true,
-            user: user.toPublicJSON(),
-            token,
+            message: 'Login should be performed on the client side using Firebase Auth SDK',
         });
 
     } catch (error) {

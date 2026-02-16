@@ -1,5 +1,4 @@
-import connectDB from '../lib/mongodb.js';
-import User from '../models/User.js';
+import * as usersModel from '../models/firestore/users.js';
 import { authMiddleware, jsonResponse, errorResponse } from '../lib/auth.js';
 
 export default async function handler(req, res) {
@@ -16,8 +15,6 @@ export default async function handler(req, res) {
             return errorResponse(res, authResult.error, authResult.status);
         }
 
-        await connectDB();
-
         // Get user ID from query params
         const { id } = req.query;
 
@@ -27,26 +24,27 @@ export default async function handler(req, res) {
 
         // Parse request body
         const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
-        const { avatar } = body;
+        const updates = {};
 
-        // Find and update user
-        const user = await User.findById(id);
+        // Only allow updating certain fields
+        const allowedFields = ['avatar', 'name', 'gitHubUsername', 'standupSettings'];
+        allowedFields.forEach(field => {
+            if (body[field] !== undefined) {
+                updates[field] = body[field];
+            }
+        });
+
+        // Update user in Firestore
+        const user = await usersModel.updateUser(id, updates);
 
         if (!user) {
             return errorResponse(res, 'User not found', 404);
         }
 
-        // Update avatar if provided
-        if (avatar !== undefined) {
-            user.avatar = avatar;
-        }
-
-        await user.save();
-
         // Return updated user data
         return jsonResponse(res, {
             success: true,
-            user: user.toPublicJSON(),
+            user: usersModel.toPublicJSON(user),
         });
 
     } catch (error) {

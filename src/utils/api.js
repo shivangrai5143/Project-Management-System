@@ -1,22 +1,31 @@
 /**
  * API Client for backend communication
- * Handles JWT tokens, request formatting, and error handling
+ * Handles Firebase Auth tokens, request formatting, and error handling
  */
+
+import { auth } from '../lib/firebase';
 
 const API_BASE = '/api';
 
-// Token storage
-const TOKEN_KEY = 'pms_auth_token';
-
-export const getToken = () => localStorage.getItem(TOKEN_KEY);
-export const setToken = (token) => localStorage.setItem(TOKEN_KEY, token);
-export const removeToken = () => localStorage.removeItem(TOKEN_KEY);
+/**
+ * Get current Firebase Auth ID token
+ */
+export const getToken = async () => {
+    try {
+        const user = auth.currentUser;
+        if (!user) return null;
+        return await user.getIdToken();
+    } catch (error) {
+        console.error('Error getting Firebase token:', error);
+        return null;
+    }
+};
 
 /**
  * Make an authenticated API request
  */
 async function apiRequest(endpoint, options = {}) {
-    const token = getToken();
+    const token = await getToken();
 
     const headers = {
         'Content-Type': 'application/json',
@@ -58,44 +67,23 @@ class ApiError extends Error {
 }
 
 // ============ AUTH API ============
+// Note: Login and signup are handled by Firebase Auth on the client side
+// These methods are kept for backward compatibility with other parts of the app
 
 export const authApi = {
-    async register(email, password, name) {
-        const data = await apiRequest('/auth/register', {
-            method: 'POST',
-            body: { email, password, name },
-        });
-
-        if (data.token) {
-            setToken(data.token);
-        }
-
-        return data;
-    },
-
-    async login(email, password) {
-        const data = await apiRequest('/auth/login', {
-            method: 'POST',
-            body: { email, password },
-        });
-
-        if (data.token) {
-            setToken(data.token);
-        }
-
-        return data;
-    },
-
     async getMe() {
         return apiRequest('/auth/me');
     },
 
+    // Firebase Auth handles login/signup on client side now
+    // These are legacy methods
     logout() {
-        removeToken();
+        // Firebase signOut is handled in AuthContext
+        console.log('Logout handled by Firebase Auth');
     },
 
     isAuthenticated() {
-        return !!getToken();
+        return !!auth.currentUser;
     },
 };
 

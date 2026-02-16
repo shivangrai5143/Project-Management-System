@@ -1,22 +1,14 @@
-import jwt from 'jsonwebtoken';
-
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-in-production';
-const JWT_EXPIRES_IN = '7d';
+import { auth } from './firebase-admin.js';
 
 /**
- * Sign a JWT token with user data
+ * Verify Firebase ID token from Authorization header
  */
-export function signToken(payload) {
-    return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
-}
-
-/**
- * Verify and decode a JWT token
- */
-export function verifyToken(token) {
+export async function verifyFirebaseToken(token) {
     try {
-        return jwt.verify(token, JWT_SECRET);
+        const decodedToken = await auth.verifyIdToken(token);
+        return decodedToken;
     } catch (error) {
+        console.error('Token verification error:', error);
         return null;
     }
 }
@@ -36,7 +28,7 @@ export function getTokenFromHeader(req) {
 
 /**
  * Authentication middleware for API routes
- * Adds `req.user` if token is valid
+ * Verifies Firebase token and adds `user` to the result
  */
 export async function authMiddleware(req) {
     const token = getTokenFromHeader(req);
@@ -45,13 +37,21 @@ export async function authMiddleware(req) {
         return { error: 'No token provided', status: 401 };
     }
 
-    const decoded = verifyToken(token);
+    const decodedToken = await verifyFirebaseToken(token);
 
-    if (!decoded) {
+    if (!decodedToken) {
         return { error: 'Invalid or expired token', status: 401 };
     }
 
-    return { user: decoded };
+    // Return decoded token data (uid, email, etc.)
+    return {
+        user: {
+            id: decodedToken.uid,
+            uid: decodedToken.uid,
+            email: decodedToken.email,
+            name: decodedToken.name || decodedToken.email?.split('@')[0],
+        }
+    };
 }
 
 /**
@@ -67,3 +67,4 @@ export function jsonResponse(res, data, status = 200) {
 export function errorResponse(res, message, status = 400) {
     res.status(status).json({ error: message });
 }
+

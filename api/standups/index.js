@@ -1,5 +1,5 @@
-import connectDB from '../lib/mongodb.js';
-import Standup from '../models/Standup.js';
+import * as standupsModel from '../models/firestore/standups.js';
+import * as usersModel from '../models/firestore/users.js';
 import { authMiddleware, jsonResponse, errorResponse } from '../lib/auth.js';
 
 export default async function handler(req, res) {
@@ -10,8 +10,7 @@ export default async function handler(req, res) {
         return errorResponse(res, authResult.error, authResult.status);
     }
 
-    await connectDB();
-    const userId = authResult.user.id;
+    const userId = authResult.user.uid;
 
     switch (req.method) {
         case 'GET':
@@ -29,7 +28,7 @@ async function getStandups(req, res, userId) {
         const { limit = 30, today } = req.query;
 
         if (today === 'true') {
-            const todayStandup = await Standup.getTodayStandup(userId);
+            const todayStandup = await standupsModel.getTodayStandup(userId);
             return jsonResponse(res, {
                 success: true,
                 standup: todayStandup,
@@ -37,7 +36,7 @@ async function getStandups(req, res, userId) {
             });
         }
 
-        const standups = await Standup.getHistory(userId, parseInt(limit));
+        const standups = await standupsModel.getStandupHistory(userId, parseInt(limit));
 
         return jsonResponse(res, {
             success: true,
@@ -61,15 +60,22 @@ async function createStandup(req, res, userId, userName) {
         }
 
         // Check if already submitted today
-        const existingStandup = await Standup.getTodayStandup(userId);
+        const existingStandup = await standupsModel.getTodayStandup(userId);
         if (existingStandup) {
             return errorResponse(res, 'You have already submitted a standup today');
         }
 
+        // Get user name if not provided
+        let standupUserName = userName;
+        if (!standupUserName) {
+            const user = await usersModel.getUser(userId);
+            standupUserName = user?.name || user?.email || 'Unknown';
+        }
+
         // Create standup
-        const standup = await Standup.create({
+        const standup = await standupsModel.createStandup({
             userId,
-            userName,
+            userName: standupUserName,
             response: response.trim(),
             selectedSuggestions: selectedSuggestions || [],
             allSuggestions: allSuggestions || [],

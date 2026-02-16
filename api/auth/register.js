@@ -1,6 +1,6 @@
-import connectDB from '../lib/mongodb.js';
-import User from '../models/User.js';
-import { signToken, jsonResponse, errorResponse } from '../lib/auth.js';
+import { auth } from '../lib/firebase-admin.js';
+import * as usersModel from '../models/firestore/users.js';
+import { jsonResponse, errorResponse } from '../lib/auth.js';
 
 export default async function handler(req, res) {
     // Only allow POST
@@ -9,8 +9,6 @@ export default async function handler(req, res) {
     }
 
     try {
-        await connectDB();
-
         const { email, password, name } = req.body;
 
         // Validate input
@@ -23,34 +21,48 @@ export default async function handler(req, res) {
         }
 
         // Check if user already exists
-        const existingUser = await User.findOne({ email: email.toLowerCase() });
+        const existingUser = await usersModel.getUserByEmail(email);
         if (existingUser) {
             return errorResponse(res, 'Email already registered');
         }
 
-        // Create new user
-        const user = await User.create({
+        // Create Firebase Auth user
+        const userRecord = await auth.createUser({
             email: email.toLowerCase(),
             password,
+            displayName: name,
+        });
+
+        // Create user profile in Firestore
+        const user = await usersModel.createUser(userRecord.uid, {
+            email: email.toLowerCase(),
             name,
         });
 
-        // Generate JWT token
-        const token = signToken({
-            id: user._id,
-            email: user.email,
-            name: user.name,
-        });
+        // Generate custom token for immediate login
+        const token = await auth.createCustomToken(userRecord.uid);
 
         // Return user data and token
         return jsonResponse(res, {
             success: true,
-            user: user.toPublicJSON(),
-            token,
+            user: usersModel.toPublicJSON(user),
+            token, // Custom token - client will exchange this for ID token
         }, 201);
 
     } catch (error) {
         console.error('Register error:', error);
+
+        // Handle specific Firebase errors
+        if (error.code === 'auth/email-already-exists') {
+            return errorResponse(res, 'Email already registered');
+        }
+        if (error.code === 'auth/invalid-email') {
+            return errorResponse(res, 'Invalid email address');
+        }
+        if (error.code === 'auth/weak-password') {
+            return errorResponse(res, 'Password is too weak');
+        }
+
         return errorResponse(res, 'Server error', 500);
     }
 }

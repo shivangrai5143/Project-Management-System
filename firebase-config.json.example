@@ -1,0 +1,5 @@
+# Firebase Admin SDK Configuration
+# Get these from Firebase Console > Project Settings > Service Accounts
+# Generate new private key and download the JSON file
+# This file should NEVER be committed to Git
+firebase-config.json

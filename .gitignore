@@ -17,6 +17,10 @@ dist-ssr
 .env.local
 .env.*.local
 
+# Firebase Admin SDK
+firebase-config.json
+
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

@@ -1,6 +1,5 @@
-import connectDB from '../lib/mongodb.js';
-import Whiteboard from '../models/Whiteboard.js';
-import { verifyToken } from '../lib/auth.js';
+import * as whiteboardsModel from '../models/firestore/whiteboards.js';
+import { verifyFirebaseToken } from '../lib/auth.js';
 
 export default async function handler(req, res) {
     // Enable CORS
@@ -14,8 +13,6 @@ export default async function handler(req, res) {
     }
 
     try {
-        await connectDB();
-
         // Verify authentication
         const authHeader = req.headers.authorization;
         if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -23,7 +20,7 @@ export default async function handler(req, res) {
         }
 
         const token = authHeader.split(' ')[1];
-        const decoded = verifyToken(token);
+        const decoded = await verifyFirebaseToken(token);
         if (!decoded) {
             return res.status(401).json({ error: 'Invalid token' });
         }
@@ -38,19 +35,11 @@ export default async function handler(req, res) {
         if (req.method === 'GET') {
             const { since, lastCleared: clientLastCleared } = req.query;
 
-            let whiteboard = await Whiteboard.findOne({ projectId });
+            let whiteboard = await whiteboardsModel.getWhiteboardByProject(projectId);
 
             if (!whiteboard) {
                 // Create empty whiteboard if doesn't exist
-                whiteboard = await Whiteboard.create({
-                    projectId,
-                    strokes: [],
-                    shapes: [],
-                    texts: [],
-                    stickyNotes: [],
-                    lastCleared: null,
-                    version: 0
-                });
+                whiteboard = await whiteboardsModel.createWhiteboard(projectId);
             }
 
             // Check if board was cleared after client's last known clear time
@@ -89,84 +78,71 @@ export default async function handler(req, res) {
 
             if (action === 'clear') {
                 // Clear the whiteboard
-                const whiteboard = await Whiteboard.findOneAndUpdate(
-                    { projectId },
-                    {
-                        $set: {
-                            strokes: [],
-                            shapes: [],
-                            texts: [],
-                            stickyNotes: [],
-                            lastCleared: new Date()
-                        },
-                        $inc: { version: 1 }
-                    },
-                    { new: true, upsert: true }
-                );
+                const whiteboard = await whiteboardsModel.clearWhiteboard(projectId);
 
                 return res.status(200).json({
                     success: true,
-                    lastCleared: whiteboard.lastCleared.getTime(),
+                    lastCleared: whiteboard.lastCleared ? new Date(whiteboard.lastCleared).getTime() : null,
                     version: whiteboard.version
                 });
             }
 
-            const updateOps = { $inc: { version: 1 } };
-            const pushOps = {};
+            // Get current whiteboard or create if doesn't exist
+            let whiteboard = await whiteboardsModel.getWhiteboardByProject(projectId);
+            if (!whiteboard) {
+                whiteboard = await whiteboardsModel.createWhiteboard(projectId);
+            }
+
+            const updates = {
+                version: whiteboard.version + 1,
+                updatedAt: new Date().toISOString(),
+            };
 
             // Handle strokes
             if (strokes && Array.isArray(strokes) && strokes.length > 0) {
                 const strokesWithUser = strokes.map(stroke => ({
                     ...stroke,
-                    userId: decoded.userId,
-                    userName: decoded.name || 'Unknown',
-                    createdAt: new Date()
+                    userId: decoded.uid,
+                    userName: decoded.name || decoded.email || 'Unknown',
+                    createdAt: new Date().toISOString()
                 }));
-                pushOps.strokes = { $each: strokesWithUser };
+                updates.strokes = [...(whiteboard.strokes || []), ...strokesWithUser];
             }
 
             // Handle shapes
             if (shapes && Array.isArray(shapes) && shapes.length > 0) {
                 const shapesWithUser = shapes.map(shape => ({
                     ...shape,
-                    userId: decoded.userId,
-                    userName: decoded.name || 'Unknown',
-                    createdAt: new Date()
+                    userId: decoded.uid,
+                    userName: decoded.name || decoded.email || 'Unknown',
+                    createdAt: new Date().toISOString()
                 }));
-                pushOps.shapes = { $each: shapesWithUser };
+                updates.shapes = [...(whiteboard.shapes || []), ...shapesWithUser];
             }
 
             // Handle texts
             if (texts && Array.isArray(texts) && texts.length > 0) {
                 const textsWithUser = texts.map(text => ({
                     ...text,
-                    userId: decoded.userId,
-                    userName: decoded.name || 'Unknown',
-                    createdAt: new Date()
+                    userId: decoded.uid,
+                    userName: decoded.name || decoded.email || 'Unknown',
+                    createdAt: new Date().toISOString()
                 }));
-                pushOps.texts = { $each: textsWithUser };
+                updates.texts = [...(whiteboard.texts || []), ...textsWithUser];
             }
 
             // Handle sticky notes
             if (stickyNotes && Array.isArray(stickyNotes) && stickyNotes.length > 0) {
                 const notesWithUser = stickyNotes.map(note => ({
                     ...note,
-                    userId: decoded.userId,
-                    userName: decoded.name || 'Unknown',
-                    createdAt: new Date()
+                    userId: decoded.uid,
+                    userName: decoded.name || decoded.email || 'Unknown',
+                    createdAt: new Date().toISOString()
                 }));
-                pushOps.stickyNotes = { $each: notesWithUser };
+                updates.stickyNotes = [...(whiteboard.stickyNotes || []), ...notesWithUser];
             }
 
-            if (Object.keys(pushOps).length > 0) {
-                updateOps.$push = pushOps;
-            }
-
-            const whiteboard = await Whiteboard.findOneAndUpdate(
-                { projectId },
-                updateOps,
-                { new: true, upsert: true }
-            );
+            whiteboard = await whiteboardsModel.updateWhiteboard(projectId, updates);
 
             return res.status(200).json({
                 success: true,
@@ -180,6 +156,11 @@ export default async function handler(req, res) {
 
             if (!elementType || !elementId || !updates) {
                 return res.status(400).json({ error: 'elementType, elementId, and updates are required' });
+            }
+
+            const whiteboard = await whiteboardsModel.getWhiteboardByProject(projectId);
+            if (!whiteboard) {
+                return res.status(404).json({ error: 'Whiteboard not found' });
             }
 
             const fieldMap = {
@@ -203,31 +184,19 @@ export default async function handler(req, res) {
                 return res.status(400).json({ error: 'Invalid element type' });
             }
 
-            // Build update object
-            const updateObj = {};
-            Object.keys(updates).forEach(key => {
-                updateObj[`${field}.$[elem].${key}`] = updates[key];
-            });
-
-            const whiteboard = await Whiteboard.findOneAndUpdate(
-                { projectId },
-                {
-                    $set: updateObj,
-                    $inc: { version: 1 }
-                },
-                {
-                    new: true,
-                    arrayFilters: [{ [`elem.${idField}`]: elementId }]
-                }
+            // Update the specific element
+            const elements = whiteboard[field] || [];
+            const updatedElements = elements.map(elem =>
+                elem[idField] === elementId ? { ...elem, ...updates } : elem
             );
 
-            if (!whiteboard) {
-                return res.status(404).json({ error: 'Whiteboard not found' });
-            }
+            const updatedWhiteboard = await whiteboardsModel.updateWhiteboard(projectId, {
+                [field]: updatedElements
+            });
 
             return res.status(200).json({
                 success: true,
-                version: whiteboard.version
+                version: updatedWhiteboard.version
             });
         }
 
@@ -237,29 +206,21 @@ export default async function handler(req, res) {
 
             // If no specific element, clear entire board
             if (!elementType || !elementId) {
-                const whiteboard = await Whiteboard.findOneAndUpdate(
-                    { projectId },
-                    {
-                        $set: {
-                            strokes: [],
-                            shapes: [],
-                            texts: [],
-                            stickyNotes: [],
-                            lastCleared: new Date()
-                        },
-                        $inc: { version: 1 }
-                    },
-                    { new: true, upsert: true }
-                );
+                const whiteboard = await whiteboardsModel.clearWhiteboard(projectId);
 
                 return res.status(200).json({
                     success: true,
-                    lastCleared: whiteboard.lastCleared.getTime(),
+                    lastCleared: whiteboard.lastCleared ? new Date(whiteboard.lastCleared).getTime() : null,
                     version: whiteboard.version
                 });
             }
 
             // Delete specific element
+            const whiteboard = await whiteboardsModel.getWhiteboardByProject(projectId);
+            if (!whiteboard) {
+                return res.status(404).json({ error: 'Whiteboard not found' });
+            }
+
             const fieldMap = {
                 stroke: { field: 'strokes', idField: 'strokeId' },
                 shape: { field: 'shapes', idField: 'shapeId' },
@@ -272,18 +233,17 @@ export default async function handler(req, res) {
                 return res.status(400).json({ error: 'Invalid element type' });
             }
 
-            const whiteboard = await Whiteboard.findOneAndUpdate(
-                { projectId },
-                {
-                    $pull: { [config.field]: { [config.idField]: elementId } },
-                    $inc: { version: 1 }
-                },
-                { new: true }
-            );
+            // Filter out the element to delete
+            const elements = whiteboard[config.field] || [];
+            const filteredElements = elements.filter(elem => elem[config.idField] !== elementId);
+
+            const updatedWhiteboard = await whiteboardsModel.updateWhiteboard(projectId, {
+                [config.field]: filteredElements
+            });
 
             return res.status(200).json({
                 success: true,
-                version: whiteboard?.version || 0
+                version: updatedWhiteboard?.version || 0
             });
         }
 

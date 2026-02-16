@@ -1,5 +1,4 @@
-import connectDB from '../lib/mongodb.js';
-import Task from '../models/Task.js';
+import * as tasksModel from '../models/firestore/tasks.js';
 import { authMiddleware, jsonResponse, errorResponse } from '../lib/auth.js';
 
 export default async function handler(req, res) {
@@ -10,8 +9,7 @@ export default async function handler(req, res) {
         return errorResponse(res, authResult.error, authResult.status);
     }
 
-    await connectDB();
-    const userId = authResult.user.id;
+    const userId = authResult.user.uid;
 
     switch (req.method) {
         case 'GET':
@@ -33,21 +31,18 @@ async function getTasks(req, res, userId) {
         let tasks;
 
         if (projectId) {
-            tasks = await Task.getByProject(projectId, status || null);
+            tasks = await tasksModel.getTasksByProject(projectId, status || null);
         } else if (assignee === 'me') {
-            tasks = await Task.getByAssignee(userId);
+            tasks = await tasksModel.getTasksByAssignee(userId);
         } else {
-            // Get all tasks user has access to (via projects they're part of)
-            tasks = await Task.find({
-                $or: [
-                    { creatorId: userId },
-                    { assigneeId: userId },
-                ]
-            })
-                .populate('projectId', 'name color')
-                .populate('assigneeId', 'name avatar')
-                .sort({ updatedAt: -1 })
-                .limit(50);
+            // For Firestore, we need to query differently since there's no join
+            // Get tasks assigned to user
+            const assignedTasks = await tasksModel.getTasksByAssignee(userId);
+            return jsonResponse(res, {
+                success: true,
+                tasks: assignedTasks,
+                count: assignedTasks.length,
+            });
         }
 
         return jsonResponse(res, {
@@ -76,11 +71,12 @@ async function createTask(req, res, userId) {
         }
 
         // Get the highest order for the status column in this project
-        const lastTask = await Task.findOne({ projectId, status: status || 'todo' })
-            .sort({ order: -1 });
-        const newOrder = lastTask ? lastTask.order + 1 : 0;
+        const existingTasks = await tasksModel.getTasksByProject(projectId, status || 'todo');
+        const newOrder = existingTasks.length > 0
+            ? Math.max(...existingTasks.map(t => t.order || 0)) + 1
+            : 0;
 
-        const task = await Task.create({
+        const task = await tasksModel.createTask({
             title: title.trim(),
             description: description || '',
             projectId,
@@ -88,7 +84,7 @@ async function createTask(req, res, userId) {
             creatorId: userId,
             status: status || 'todo',
             priority: priority || 'medium',
-            dueDate: dueDate ? new Date(dueDate) : null,
+            dueDate: dueDate ? new Date(dueDate).toISOString() : null,
             labels: labels || [],
             order: newOrder,
         });
@@ -114,33 +110,27 @@ async function updateTask(req, res, userId) {
             return errorResponse(res, 'Task ID is required');
         }
 
-        const task = await Task.findById(taskId);
+        const task = await tasksModel.getTask(taskId);
 
         if (!task) {
             return errorResponse(res, 'Task not found', 404);
         }
 
-        // Update allowed fields
+        // Build updates object with only allowed fields
         const allowedUpdates = ['title', 'description', 'status', 'priority', 'dueDate', 'assigneeId', 'labels', 'order'];
+        const updateData = {};
 
         allowedUpdates.forEach(field => {
             if (updates[field] !== undefined) {
-                task[field] = updates[field];
+                updateData[field] = updates[field];
             }
         });
 
-        // Handle completion
-        if (updates.status === 'done' && !task.completedAt) {
-            task.completedAt = new Date();
-        } else if (updates.status && updates.status !== 'done') {
-            task.completedAt = null;
-        }
-
-        await task.save();
+        const updatedTask = await tasksModel.updateTask(taskId, updateData);
 
         return jsonResponse(res, {
             success: true,
-            task,
+            task: updatedTask,
             message: 'Task updated successfully!',
         });
 

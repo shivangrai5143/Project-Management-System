@@ -1,5 +1,4 @@
-import connectDB from '../lib/mongodb.js';
-import Project from '../models/Project.js';
+import * as projectsModel from '../models/firestore/projects.js';
 import { authMiddleware, jsonResponse, errorResponse } from '../lib/auth.js';
 
 export default async function handler(req, res) {
@@ -10,8 +9,7 @@ export default async function handler(req, res) {
         return errorResponse(res, authResult.error, authResult.status);
     }
 
-    await connectDB();
-    const userId = authResult.user.id;
+    const userId = authResult.user.uid;
 
     switch (req.method) {
         case 'GET':
@@ -26,7 +24,7 @@ export default async function handler(req, res) {
 // GET /api/projects - Get all projects for user
 async function getProjects(req, res, userId) {
     try {
-        const projects = await Project.getForUser(userId);
+        const projects = await projectsModel.getProjectsForUser(userId);
 
         return jsonResponse(res, {
             success: true,
@@ -50,7 +48,7 @@ async function createProject(req, res, userId) {
         }
 
         // Create project with owner as first member
-        const project = await Project.create({
+        const project = await projectsModel.createProject({
             name: name.trim(),
             description: description || '',
             color: color || '#6366f1',

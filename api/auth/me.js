@@ -1,6 +1,5 @@
-import connectDB from '../lib/mongodb.js';
-import User from '../models/User.js';
 import { authMiddleware, jsonResponse, errorResponse } from '../lib/auth.js';
+import * as usersModel from '../models/firestore/users.js';
 
 export default async function handler(req, res) {
     // Only allow GET
@@ -9,17 +8,15 @@ export default async function handler(req, res) {
     }
 
     try {
-        // Verify authentication
+        // Verify Firebase token
         const authResult = await authMiddleware(req);
 
         if (authResult.error) {
             return errorResponse(res, authResult.error, authResult.status);
         }
 
-        await connectDB();
-
-        // Get user from database
-        const user = await User.findById(authResult.user.id);
+        // Get user data from Firestore
+        const user = await usersModel.getUser(authResult.user.uid);
 
         if (!user) {
             return errorResponse(res, 'User not found', 404);
@@ -28,7 +25,7 @@ export default async function handler(req, res) {
         // Return user data
         return jsonResponse(res, {
             success: true,
-            user: user.toPublicJSON(),
+            user: usersModel.toPublicJSON(user),
         });
 
     } catch (error) {
