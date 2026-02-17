@@ -1,4 +1,13 @@
 import admin from 'firebase-admin';
+import dotenv from 'dotenv';
+import { readFileSync } from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+
+dotenv.config();
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 // Initialize Firebase Admin SDK
 let app;
@@ -7,7 +16,7 @@ if (!admin.apps.length) {
     try {
         // Try to load from service account file first
         let credential;
-        
+
         if (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_CLIENT_EMAIL && process.env.FIREBASE_PRIVATE_KEY) {
             // Use environment variables
             credential = admin.credential.cert({
@@ -17,10 +26,9 @@ if (!admin.apps.length) {
             });
         } else {
             // Use service account file
-            const serviceAccount = await import('../../firebase-config.json', {
-                assert: { type: 'json' }
-            });
-            credential = admin.credential.cert(serviceAccount.default);
+            const configPath = join(__dirname, '..', '..', 'firebase-config.json');
+            const serviceAccount = JSON.parse(readFileSync(configPath, 'utf8'));
+            credential = admin.credential.cert(serviceAccount);
         }
 
         app = admin.initializeApp({

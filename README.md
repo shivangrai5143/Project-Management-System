@@ -1,23 +1,59 @@
-# React + Vite
+# YojnaFlow - Project Management System
 
-This template provides a minimal setup to get React working in Vite with HMR and some  rules.
+A full-stack project management system with Firebase authentication and Firestore database.
 
-Currently, two official plugins are available:
+## Project Structure
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+```
+├── frontend/          # React + Vite (deployed on Vercel)
+│   ├── src/           # React components, pages, contexts
+│   ├── public/        # Static assets
+│   └── package.json   # Frontend dependencies
+│
+├── backend/           # Express.js API (deployed on Render)
+│   ├── api/           # Route handlers and models
+│   ├── server.js      # Express server entry point
+│   └── package.json   # Backend dependencies
+```
 
-## React Compiler
+## Getting Started
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+### Backend
 
-## Expanding the ESLint configuration
+```bash
+cd backend
+npm install
+# Create .env from .env.example and add your Firebase credentials
+npm run dev
+```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+The backend will run on `http://localhost:5000`.
 
+### Frontend
 
-Frontend: React + Tailwind CSS (I assume, for speed).
+```bash
+cd frontend
+npm install
+# Create .env from .env.example and add your Firebase config
+npm run dev
+```
 
-Real-time: Socket.io (Node.js/Express).
+The frontend will run on `http://localhost:5173`.
 
-Encryption: (Since you mentioned E2EE) You should be using CryptoJS on the frontend before the message even hits the socket.
+## Deployment
+
+- **Frontend**: Deploy `frontend/` folder to [Vercel](https://vercel.com)
+- **Backend**: Deploy `backend/` folder to [Render](https://render.com)
+
+### Environment Variables
+
+See `frontend/.env.example` and `backend/.env.example` for required variables.
+
+> **Important**: Set `VITE_API_URL` in frontend to your Render backend URL, and set `FRONTEND_URL` in backend to your Vercel frontend URL for CORS.
+
+## Tech Stack
+
+- **Frontend**: React, Vite, TailwindCSS, Firebase Auth
+- **Backend**: Express.js, Firebase Admin SDK, Firestore
+- **Auth**: Firebase Authentication
+- **Database**: Cloud Firestore
