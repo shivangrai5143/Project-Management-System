@@ -58,7 +58,7 @@ const LoginPage = () => {
                             label="Email"
                             type="email"
                             icon={Mail}
-                            placeholder="shivang123@gmail.com"
+                            placeholder="you@example.com"
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
                             required
@@ -106,11 +106,6 @@ const LoginPage = () => {
                         </Link>
                     </p>
 
-                    <div className="mt-8 p-4 rounded-xl bg-slate-800/50 border border-slate-700">
-                        <p className="text-sm text-slate-400 mb-2">Demo credentials:</p>
-                        <p className="text-sm text-slate-300">Email: <span className="text-white font-mono">shivang123@gmail.com</span></p>
-                        <p className="text-sm text-slate-300">Password: <span className="text-white font-mono">password123</span></p>
-                    </div>
                 </div>
             </div>
 
