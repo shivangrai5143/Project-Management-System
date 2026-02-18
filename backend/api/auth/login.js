@@ -1,5 +1,5 @@
 import { jsonResponse, errorResponse } from '../lib/auth.js';
-import express
+
 export default async function handler(req, res) {
     // Only allow POST
     if (req.method !== 'POST') {
