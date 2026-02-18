@@ -1,6 +1,6 @@
-import { createContext, useContext, useState, useEffect } from 'react';
-import { getItem, setItem, STORAGE_KEYS } from '../utils/storage';
-import { generateId } from '../utils/helpers';
+import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { chatService } from '../services/firestore';
+import { useAuth } from './AuthContext';
 
 const ChatContext = createContext();
 
@@ -14,33 +14,35 @@ export const useChat = () => {
 
 export const ChatProvider = ({ children }) => {
     const [messages, setMessages] = useState([]);
+    const { user } = useAuth();
 
+    // Listen to all chat messages from Firestore
     useEffect(() => {
-        // Load messages from localStorage
-        const savedMessages = getItem(STORAGE_KEYS.CHAT_MESSAGES);
-        if (savedMessages) {
-            setMessages(savedMessages);
+        if (!user?.id) {
+            setMessages([]);
+            return;
         }
-    }, []);
 
-    const saveMessages = (newMessages) => {
-        setMessages(newMessages);
-        setItem(STORAGE_KEYS.CHAT_MESSAGES, newMessages);
-    };
+        const unsub = chatService.onAllMessagesChange((messagesList) => {
+            setMessages(messagesList);
+        });
 
-    const sendMessage = (projectId, userId, userName, content) => {
-        const newMessage = {
-            id: generateId(),
-            projectId,
-            userId,
-            userName,
-            content,
-            createdAt: new Date().toISOString(),
-        };
+        return () => unsub();
+    }, [user?.id]);
 
-        const updatedMessages = [...messages, newMessage];
-        saveMessages(updatedMessages);
-        return newMessage;
+    const sendMessage = async (projectId, userId, userName, content) => {
+        try {
+            const newMessage = await chatService.send({
+                projectId,
+                userId,
+                userName,
+                content,
+            });
+            return newMessage;
+        } catch (err) {
+            console.error('Failed to send message:', err);
+            throw err;
+        }
     };
 
     const getMessagesByProject = (projectId) => {
@@ -49,9 +51,12 @@ export const ChatProvider = ({ children }) => {
             .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
     };
 
-    const deleteMessage = (messageId) => {
-        const updatedMessages = messages.filter(msg => msg.id !== messageId);
-        saveMessages(updatedMessages);
+    const deleteMessage = async (messageId) => {
+        try {
+            await chatService.delete(messageId);
+        } catch (err) {
+            console.error('Failed to delete message:', err);
+        }
     };
 
     const getUnreadCount = (projectId, lastReadAt) => {

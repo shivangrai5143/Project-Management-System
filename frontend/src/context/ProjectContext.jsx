@@ -1,8 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react';
-import { getItem, setItem, STORAGE_KEYS } from '../utils/storage';
-import { projectsApi } from '../utils/api';
-import { demoProjects, demoTeam } from '../data/mockData';
-import { generateId } from '../utils/helpers';
+import { projectsService, usersService } from '../services/firestore';
+import { useAuth } from './AuthContext';
 
 const ProjectContext = createContext();
 
@@ -14,118 +12,74 @@ export const useProjects = () => {
     return context;
 };
 
-// Check if we should use API or localStorage fallback
-const USE_API = false; // Set to true when backend is deployed
-
 export const ProjectProvider = ({ children }) => {
     const [projects, setProjects] = useState([]);
     const [team, setTeam] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
+    const { user } = useAuth();
 
+    // Listen to projects and team in real-time from Firestore
     useEffect(() => {
-        const loadProjects = async () => {
-            if (USE_API) {
-                try {
-                    const data = await projectsApi.getAll();
-                    setProjects(data.projects);
-                } catch (err) {
-                    console.error('Failed to load projects from API:', err);
-                    // Fallback to localStorage
-                    loadFromLocalStorage();
-                }
-            } else {
-                loadFromLocalStorage();
-            }
+        if (!user?.id) {
+            setProjects([]);
+            setTeam([]);
             setIsLoading(false);
+            return;
+        }
+
+        setIsLoading(true);
+
+        // Listen to projects where user is owner or team member
+        const unsubProjects = projectsService.onProjectsChange(user.id, (projectsList) => {
+            setProjects(projectsList);
+            setIsLoading(false);
+        });
+
+        // Listen to all users for team display
+        const unsubUsers = usersService.onUsersChange((usersList) => {
+            setTeam(usersList.map(u => ({
+                id: u.id,
+                name: u.name,
+                email: u.email,
+                avatar: u.avatar || null,
+                role: u.role || 'member',
+            })));
+        });
+
+        return () => {
+            unsubProjects();
+            unsubUsers();
         };
-
-        const loadFromLocalStorage = () => {
-            const savedProjects = getItem(STORAGE_KEYS.PROJECTS);
-            const savedTeam = getItem(STORAGE_KEYS.TEAM);
-
-            if (savedProjects) {
-                setProjects(savedProjects);
-            } else {
-                setProjects(demoProjects);
-                setItem(STORAGE_KEYS.PROJECTS, demoProjects);
-            }
-
-            if (savedTeam) {
-                setTeam(savedTeam);
-            } else {
-                setTeam(demoTeam);
-                setItem(STORAGE_KEYS.TEAM, demoTeam);
-            }
-        };
-
-        loadProjects();
-    }, []);
-
-    const saveProjects = (newProjects) => {
-        setProjects(newProjects);
-        setItem(STORAGE_KEYS.PROJECTS, newProjects);
-    };
+    }, [user?.id]);
 
     const createProject = async (projectData) => {
-        if (USE_API) {
-            try {
-                const data = await projectsApi.create(
-                    projectData.name,
-                    projectData.description,
-                    projectData.color,
-                    projectData.icon
-                );
-                const newProject = data.project;
-                setProjects(prev => [...prev, newProject]);
-                return newProject;
-            } catch (err) {
-                console.error('Failed to create project:', err);
-                throw err;
-            }
-        } else {
-            const newProject = {
-                id: generateId(),
+        try {
+            const newProject = await projectsService.create({
                 ...projectData,
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
-                status: 'active',
-                teamIds: projectData.teamIds || [],
-            };
-
-            const updatedProjects = [...projects, newProject];
-            saveProjects(updatedProjects);
+                ownerId: user?.id,
+                teamIds: projectData.teamIds || (user?.id ? [user.id] : []),
+            });
             return newProject;
+        } catch (err) {
+            console.error('Failed to create project:', err);
+            throw err;
         }
     };
 
     const updateProject = async (id, updates) => {
-        if (USE_API) {
-            try {
-                await projectsApi.update(id, updates);
-            } catch (err) {
-                console.error('Failed to update project:', err);
-            }
+        try {
+            await projectsService.update(id, updates);
+        } catch (err) {
+            console.error('Failed to update project:', err);
         }
-
-        const updatedProjects = projects.map(project =>
-            project.id === id
-                ? { ...project, ...updates, updatedAt: new Date().toISOString() }
-                : project
-        );
-        saveProjects(updatedProjects);
     };
 
     const deleteProject = async (id) => {
-        if (USE_API) {
-            try {
-                await projectsApi.delete(id);
-            } catch (err) {
-                console.error('Failed to delete project:', err);
-            }
+        try {
+            await projectsService.delete(id);
+        } catch (err) {
+            console.error('Failed to delete project:', err);
         }
-
-        const updatedProjects = projects.filter(project => project.id !== id);
-        saveProjects(updatedProjects);
     };
 
     const getProject = (id) => {
@@ -138,46 +92,32 @@ export const ProjectProvider = ({ children }) => {
         );
     };
 
-    const addTeamMember = (projectId, userId) => {
-        const updatedProjects = projects.map(project => {
-            if (project.id === projectId && !project.teamIds?.includes(userId)) {
-                return {
-                    ...project,
-                    teamIds: [...(project.teamIds || []), userId],
-                    updatedAt: new Date().toISOString(),
-                };
-            }
-            return project;
-        });
-        saveProjects(updatedProjects);
+    const addTeamMember = async (projectId, userId) => {
+        const project = projects.find(p => p.id === projectId);
+        if (project && !project.teamIds?.includes(userId)) {
+            const updatedTeamIds = [...(project.teamIds || []), userId];
+            await updateProject(projectId, { teamIds: updatedTeamIds });
+        }
     };
 
-    const removeTeamMember = (projectId, userId) => {
-        const updatedProjects = projects.map(project => {
-            if (project.id === projectId) {
-                return {
-                    ...project,
-                    teamIds: (project.teamIds || []).filter(id => id !== userId),
-                    updatedAt: new Date().toISOString(),
-                };
-            }
-            return project;
-        });
-        saveProjects(updatedProjects);
+    const removeTeamMember = async (projectId, userId) => {
+        const project = projects.find(p => p.id === projectId);
+        if (project) {
+            const updatedTeamIds = (project.teamIds || []).filter(id => id !== userId);
+            await updateProject(projectId, { teamIds: updatedTeamIds });
+        }
     };
 
     const getTeamMember = (userId) => {
         return team.find(member => member.id === userId);
     };
 
-    const updateTeamMember = (userId, updates) => {
-        const updatedTeam = team.map(member =>
-            member.id === userId
-                ? { ...member, ...updates }
-                : member
-        );
-        setTeam(updatedTeam);
-        setItem(STORAGE_KEYS.TEAM, updatedTeam);
+    const updateTeamMember = async (userId, updates) => {
+        try {
+            await usersService.update(userId, updates);
+        } catch (err) {
+            console.error('Failed to update team member:', err);
+        }
     };
 
     return (

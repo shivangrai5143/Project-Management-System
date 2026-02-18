@@ -1,9 +1,7 @@
 import { createContext, useContext, useState, useEffect } from 'react';
-import { getItem, setItem, STORAGE_KEYS } from '../utils/storage';
-import { tasksApi } from '../utils/api';
-import { demoTasks } from '../data/mockData';
-import { generateId } from '../utils/helpers';
+import { tasksService } from '../services/firestore';
 import { logActivity, ACTIVITY_TYPES } from '../utils/activityTracker';
+import { useAuth } from './AuthContext';
 
 const TaskContext = createContext();
 
@@ -15,80 +13,36 @@ export const useTasks = () => {
     return context;
 };
 
-// Check if we should use API or localStorage fallback
-const USE_API = false; // Set to true when backend is deployed
-
 export const TaskProvider = ({ children }) => {
     const [tasks, setTasks] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
+    const { user } = useAuth();
 
+    // Listen to tasks in real-time from Firestore
     useEffect(() => {
-        const loadTasks = async () => {
-            if (USE_API) {
-                try {
-                    const data = await tasksApi.getMyTasks();
-                    setTasks(data.tasks);
-                } catch (err) {
-                    console.error('Failed to load tasks from API:', err);
-                    loadFromLocalStorage();
-                }
-            } else {
-                loadFromLocalStorage();
-            }
+        if (!user?.id) {
+            setTasks([]);
             setIsLoading(false);
-        };
+            return;
+        }
 
-        const loadFromLocalStorage = () => {
-            const savedTasks = getItem(STORAGE_KEYS.TASKS);
-            if (savedTasks) {
-                setTasks(savedTasks);
-            } else {
-                setTasks(demoTasks);
-                setItem(STORAGE_KEYS.TASKS, demoTasks);
-            }
-        };
+        setIsLoading(true);
 
-        loadTasks();
-    }, []);
+        const unsub = tasksService.onTasksChange((tasksList) => {
+            setTasks(tasksList);
+            setIsLoading(false);
+        });
 
-    const saveTasks = (newTasks) => {
-        setTasks(newTasks);
-        setItem(STORAGE_KEYS.TASKS, newTasks);
-    };
+        return () => unsub();
+    }, [user?.id]);
 
     const createTask = async (taskData, userId, userName) => {
-        if (USE_API) {
-            try {
-                const data = await tasksApi.create(taskData);
-                const newTask = data.task;
-                setTasks(prev => [...prev, newTask]);
-
-                // Log activity for standup bot
-                if (userId && userName) {
-                    logActivity(userId, userName, ACTIVITY_TYPES.TASK_CREATED, {
-                        taskId: newTask.id || newTask._id,
-                        taskTitle: newTask.title,
-                        projectId: newTask.projectId,
-                    });
-                }
-
-                return newTask;
-            } catch (err) {
-                console.error('Failed to create task:', err);
-                throw err;
-            }
-        } else {
-            const newTask = {
-                id: generateId(),
+        try {
+            const newTask = await tasksService.create({
                 ...taskData,
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
-                labels: taskData.labels || [],
+                createdBy: userId || user?.id,
                 order: tasks.filter(t => t.projectId === taskData.projectId && t.status === taskData.status).length,
-            };
-
-            const updatedTasks = [...tasks, newTask];
-            saveTasks(updatedTasks);
+            });
 
             // Log activity for standup bot
             if (userId && userName) {
@@ -100,29 +54,26 @@ export const TaskProvider = ({ children }) => {
             }
 
             return newTask;
+        } catch (err) {
+            console.error('Failed to create task:', err);
+            throw err;
         }
     };
 
     const updateTask = async (id, updates) => {
-        if (USE_API) {
-            try {
-                await tasksApi.update(id, updates);
-            } catch (err) {
-                console.error('Failed to update task:', err);
-            }
+        try {
+            await tasksService.update(id, updates);
+        } catch (err) {
+            console.error('Failed to update task:', err);
         }
-
-        const updatedTasks = tasks.map(task =>
-            task.id === id
-                ? { ...task, ...updates, updatedAt: new Date().toISOString() }
-                : task
-        );
-        saveTasks(updatedTasks);
     };
 
-    const deleteTask = (id) => {
-        const updatedTasks = tasks.filter(task => task.id !== id);
-        saveTasks(updatedTasks);
+    const deleteTask = async (id) => {
+        try {
+            await tasksService.delete(id);
+        } catch (err) {
+            console.error('Failed to delete task:', err);
+        }
     };
 
     const getTask = (id) => {
@@ -147,26 +98,14 @@ export const TaskProvider = ({ children }) => {
         const movedTask = tasks.find(t => t.id === taskId);
         const oldStatus = movedTask?.status;
 
-        if (USE_API) {
-            try {
-                await tasksApi.moveTask(taskId, newStatus, newOrder);
-            } catch (err) {
-                console.error('Failed to move task:', err);
-            }
+        try {
+            await tasksService.update(taskId, {
+                status: newStatus,
+                order: newOrder,
+            });
+        } catch (err) {
+            console.error('Failed to move task:', err);
         }
-
-        const updatedTasks = tasks.map(task => {
-            if (task.id === taskId) {
-                return {
-                    ...task,
-                    status: newStatus,
-                    order: newOrder,
-                    updatedAt: new Date().toISOString(),
-                };
-            }
-            return task;
-        });
-        saveTasks(updatedTasks);
 
         // Log activity for standup bot
         if (userId && userName && movedTask) {
@@ -188,15 +127,16 @@ export const TaskProvider = ({ children }) => {
         }
     };
 
-    const reorderTasks = (projectId, status, orderedIds) => {
-        const updatedTasks = tasks.map(task => {
-            if (task.projectId === projectId && task.status === status) {
-                const newOrder = orderedIds.indexOf(task.id);
-                return newOrder >= 0 ? { ...task, order: newOrder } : task;
-            }
-            return task;
-        });
-        saveTasks(updatedTasks);
+    const reorderTasks = async (projectId, status, orderedIds) => {
+        // Update order for each task in the list
+        const updates = orderedIds.map((taskId, index) =>
+            tasksService.update(taskId, { order: index })
+        );
+        try {
+            await Promise.all(updates);
+        } catch (err) {
+            console.error('Failed to reorder tasks:', err);
+        }
     };
 
     const getTaskStats = (projectId) => {

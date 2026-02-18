@@ -24,27 +24,42 @@ const ProjectsPage = () => {
         project.description.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
-    const handleCreateProject = (formData) => {
-        createProject({
-            ...formData,
-            ownerId: user.id,
-            teamIds: [user.id],
-        });
-        showToast('Project created successfully', 'success');
-        setIsModalOpen(false);
+    const handleCreateProject = async (formData) => {
+        try {
+            await createProject({
+                ...formData,
+                ownerId: user.id,
+                teamIds: [user.id],
+            });
+            showToast('Project created successfully', 'success');
+            setIsModalOpen(false);
+        } catch (err) {
+            console.error('Create project error:', err);
+            showToast(`Failed to create project: ${err.message}`, 'error');
+        }
     };
 
-    const handleUpdateProject = (formData) => {
-        updateProject(editingProject.id, formData);
-        showToast('Project updated successfully', 'success');
-        setIsModalOpen(false);
-        setEditingProject(null);
+    const handleUpdateProject = async (formData) => {
+        try {
+            await updateProject(editingProject.id, formData);
+            showToast('Project updated successfully', 'success');
+            setIsModalOpen(false);
+            setEditingProject(null);
+        } catch (err) {
+            console.error('Update project error:', err);
+            showToast(`Failed to update project: ${err.message}`, 'error');
+        }
     };
 
-    const handleDeleteProject = (projectId) => {
+    const handleDeleteProject = async (projectId) => {
         if (confirm('Are you sure you want to delete this project? This action cannot be undone.')) {
-            deleteProject(projectId);
-            showToast('Project deleted', 'info');
+            try {
+                await deleteProject(projectId);
+                showToast('Project deleted', 'info');
+            } catch (err) {
+                console.error('Delete project error:', err);
+                showToast(`Failed to delete project: ${err.message}`, 'error');
+            }
         }
     };
 

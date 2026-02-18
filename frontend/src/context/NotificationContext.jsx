@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { getItem, setItem, STORAGE_KEYS } from '../utils/storage';
-import { demoNotifications } from '../data/mockData';
+import { notificationsService } from '../services/firestore';
 import { generateId } from '../utils/helpers';
+import { useAuth } from './AuthContext';
 
 const NotificationContext = createContext();
 
@@ -16,70 +16,80 @@ export const useNotifications = () => {
 export const NotificationProvider = ({ children }) => {
     const [notifications, setNotifications] = useState([]);
     const [toasts, setToasts] = useState([]);
+    const { user } = useAuth();
 
+    // Listen to notifications from Firestore
     useEffect(() => {
-        // Load notifications from localStorage or use demo data
-        const savedNotifications = getItem(STORAGE_KEYS.NOTIFICATIONS);
-
-        if (savedNotifications) {
-            setNotifications(savedNotifications);
-        } else {
-            setNotifications(demoNotifications);
-            setItem(STORAGE_KEYS.NOTIFICATIONS, demoNotifications);
+        if (!user?.id) {
+            setNotifications([]);
+            return;
         }
-    }, []);
 
-    const saveNotifications = (newNotifications) => {
-        setNotifications(newNotifications);
-        setItem(STORAGE_KEYS.NOTIFICATIONS, newNotifications);
+        const unsub = notificationsService.onNotificationsChange(user.id, (notifsList) => {
+            setNotifications(notifsList);
+        });
+
+        return () => unsub();
+    }, [user?.id]);
+
+    const addNotification = useCallback(async (notification) => {
+        if (!user?.id) return null;
+
+        try {
+            const newNotification = await notificationsService.add({
+                ...notification,
+                userId: user.id,
+            });
+
+            // Also show as toast
+            showToast(notification.title, notification.type || 'info');
+
+            return newNotification;
+        } catch (err) {
+            console.error('Failed to add notification:', err);
+            return null;
+        }
+    }, [user?.id]);
+
+    const markAsRead = async (id) => {
+        try {
+            await notificationsService.markAsRead(id);
+        } catch (err) {
+            console.error('Failed to mark notification as read:', err);
+        }
     };
 
-    const addNotification = useCallback((notification) => {
-        const newNotification = {
-            id: generateId(),
-            ...notification,
-            read: false,
-            createdAt: new Date().toISOString(),
-        };
-
-        const updatedNotifications = [newNotification, ...notifications];
-        saveNotifications(updatedNotifications);
-
-        // Also show as toast
-        showToast(notification.title, notification.type || 'info');
-
-        return newNotification;
-    }, [notifications]);
-
-    const markAsRead = (id) => {
-        const updatedNotifications = notifications.map(notif =>
-            notif.id === id ? { ...notif, read: true } : notif
-        );
-        saveNotifications(updatedNotifications);
+    const markAllAsRead = async () => {
+        if (!user?.id) return;
+        try {
+            await notificationsService.markAllAsRead(user.id);
+        } catch (err) {
+            console.error('Failed to mark all as read:', err);
+        }
     };
 
-    const markAllAsRead = () => {
-        const updatedNotifications = notifications.map(notif => ({
-            ...notif,
-            read: true,
-        }));
-        saveNotifications(updatedNotifications);
+    const deleteNotification = async (id) => {
+        try {
+            await notificationsService.delete(id);
+        } catch (err) {
+            console.error('Failed to delete notification:', err);
+        }
     };
 
-    const deleteNotification = (id) => {
-        const updatedNotifications = notifications.filter(notif => notif.id !== id);
-        saveNotifications(updatedNotifications);
-    };
-
-    const clearAll = () => {
-        saveNotifications([]);
+    const clearAll = async () => {
+        if (!user?.id) return;
+        try {
+            await notificationsService.clearAll(user.id);
+        } catch (err) {
+            console.error('Failed to clear all notifications:', err);
+        }
     };
 
     const getUnreadCount = () => {
         return notifications.filter(notif => !notif.read).length;
     };
 
-    // Toast management
+    // Toast management (local only — ephemeral)
     const showToast = useCallback((message, type = 'info') => {
         const id = generateId();
         const toast = { id, message, type };

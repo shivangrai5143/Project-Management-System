@@ -1,6 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import { getItem, setItem, STORAGE_KEYS } from '../utils/storage';
-import { standupsApi } from '../utils/api';
+import { standupsService } from '../services/firestore';
 import { generateId } from '../utils/helpers';
 import {
     getYesterdayActivities,
@@ -14,6 +13,7 @@ import {
     formatGitHubSuggestions,
     isGitHubConnected,
 } from '../utils/githubSimulator';
+import { useAuth } from './AuthContext';
 
 const StandupBotContext = createContext();
 
@@ -35,9 +35,6 @@ const DEFAULT_SETTINGS = {
     snoozeDuration: 30,
 };
 
-// Check if we should use API or localStorage fallback
-const USE_API = false; // Set to true when backend is deployed
-
 export const StandupBotProvider = ({ children }) => {
     const [settings, setSettings] = useState(DEFAULT_SETTINGS);
     const [standupHistory, setStandupHistory] = useState([]);
@@ -46,33 +43,38 @@ export const StandupBotProvider = ({ children }) => {
     const [snoozedUntil, setSnoozedUntil] = useState(null);
     const [lastTriggeredDate, setLastTriggeredDate] = useState(null);
     const schedulerRef = useRef(null);
+    const { user } = useAuth();
 
-    // Load settings and history from storage
+    // Load settings and history from Firestore
     useEffect(() => {
-        const savedSettings = getItem(STORAGE_KEYS.STANDUP_SETTINGS);
-        const savedHistory = getItem(STORAGE_KEYS.STANDUP_HISTORY);
+        if (!user?.id) return;
 
-        if (savedSettings) {
-            setSettings({ ...DEFAULT_SETTINGS, ...savedSettings });
-        }
-        if (savedHistory) {
-            setStandupHistory(savedHistory);
-        }
-    }, []);
+        // Load settings
+        standupsService.getSettings(user.id).then((savedSettings) => {
+            if (savedSettings) {
+                setSettings({ ...DEFAULT_SETTINGS, ...savedSettings });
+            }
+        });
 
-    // Save settings to storage
-    const saveSettings = useCallback((newSettings) => {
+        // Listen to standup history
+        const unsub = standupsService.onStandupsChange(user.id, (standups) => {
+            setStandupHistory(standups);
+        });
+
+        return () => unsub();
+    }, [user?.id]);
+
+    // Save settings to Firestore
+    const saveSettings = useCallback(async (newSettings) => {
         setSettings(newSettings);
-        setItem(STORAGE_KEYS.STANDUP_SETTINGS, newSettings);
-    }, []);
-
-    // Save history to storage
-    const saveHistory = useCallback((newHistory) => {
-        // Keep only last 30 standups
-        const trimmed = newHistory.slice(-30);
-        setStandupHistory(trimmed);
-        setItem(STORAGE_KEYS.STANDUP_HISTORY, trimmed);
-    }, []);
+        if (user?.id) {
+            try {
+                await standupsService.saveSettings(user.id, newSettings);
+            } catch (err) {
+                console.error('Failed to save standup settings:', err);
+            }
+        }
+    }, [user?.id]);
 
     // Update settings
     const updateSettings = useCallback((updates) => {
@@ -145,35 +147,29 @@ export const StandupBotProvider = ({ children }) => {
         return true;
     }, [generateStandupSuggestions, lastTriggeredDate, snoozedUntil]);
 
-    // Submit standup response
+    // Submit standup response to Firestore
     const submitStandupResponse = useCallback(async (userId, userName, response, selectedSuggestions = []) => {
-        const standupEntry = {
-            id: generateId(),
-            userId,
-            userName,
-            response,
-            selectedSuggestions,
-            submittedAt: new Date().toISOString(),
-            suggestions: currentSuggestions,
-        };
+        try {
+            const standupEntry = await standupsService.submit({
+                userId,
+                userName,
+                response,
+                selectedSuggestions,
+                suggestions: currentSuggestions,
+            });
 
-        // Try to save to API if enabled
-        if (USE_API) {
-            try {
-                await standupsApi.submit(response, selectedSuggestions, currentSuggestions);
-            } catch (err) {
-                console.error('Failed to save standup to API:', err);
-            }
+            setIsStandupActive(false);
+            setCurrentSuggestions([]);
+
+            return standupEntry;
+        } catch (err) {
+            console.error('Failed to save standup:', err);
+            // Fallback: still close the standup UI
+            setIsStandupActive(false);
+            setCurrentSuggestions([]);
+            return null;
         }
-
-        // Always save to local history
-        const newHistory = [...standupHistory, standupEntry];
-        saveHistory(newHistory);
-        setIsStandupActive(false);
-        setCurrentSuggestions([]);
-
-        return standupEntry;
-    }, [standupHistory, currentSuggestions, saveHistory]);
+    }, [currentSuggestions]);
 
     // Dismiss standup
     const dismissStandup = useCallback((snooze = false) => {
