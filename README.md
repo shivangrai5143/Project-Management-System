@@ -1,5 +1,5 @@
 # YojnaFlow - Project Management System 
-cndsncdncdwijnc
+cndsncdncdwij
 A full-stack project management system with Firebase authentication and Firestore database.
 
 ## Project Structure
