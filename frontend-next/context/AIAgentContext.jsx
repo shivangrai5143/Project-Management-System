@@ -8,7 +8,7 @@ import { generateProjectPlan, analyzeTrends, detectRisks, getQuickInsights } fro
 const AIAgentContext = createContext();
 
 export const useAIAgent = () => {
-    const context = useContext(AIAgentContext);;
+    const context = useContext(AIAgentContext);
     if (!context) {
         throw new Error('useAIAgent must be used within an AIAgentProvider');
     }
