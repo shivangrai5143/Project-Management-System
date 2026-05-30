@@ -1,6 +1,6 @@
 'use client';
 
-import InvitePage from '@/pages/InvitePage';
+import InvitePage from '@/components/pages/InvitePage';
 
 export default function Invite() {
     return <InvitePage />;

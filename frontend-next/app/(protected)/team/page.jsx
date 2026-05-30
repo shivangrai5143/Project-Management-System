@@ -1,3 +1,3 @@
 'use client';
-import TeamPage from '@/pages/TeamPage';
+import TeamPage from '@/components/pages/TeamPage';
 export default function Team() { return <TeamPage />; }

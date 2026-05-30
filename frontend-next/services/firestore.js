@@ -4,7 +4,7 @@
  * Replaces localStorage and backend API for data persistence.
  */
 
-import { db } from '@/lib/firebase';
+import { db } from '@/lib/firebase';;
 import {
     collection,
     doc,
