@@ -36,7 +36,7 @@ export default function AccessDenied() {
                 <div className="space-y-2">
                     <h1 className="text-3xl font-bold text-white">Access Denied</h1>
                     <p className="text-slate-400 text-base leading-relaxed">
-                        You don't have permission to view this page. Contact your administrator
+                        You don&apos;t have permission to view this page. Contact your administrator
                         if you believe this is a mistake.
                     </p>
                 </div>
