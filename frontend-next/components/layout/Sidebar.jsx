@@ -22,6 +22,7 @@ import {
     FileText,
     Timer,
     ShieldCheck,
+    Activity,
 } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
@@ -51,6 +52,7 @@ const NAV_ITEMS = [
     { path: '/gamification', icon: Trophy,           label: 'Achievements', permission: RBAC_PERMISSIONS.TASKS_READ },
     { path: '/team',         icon: Users,            label: 'Team',         permission: RBAC_PERMISSIONS.TEAM_READ },
     { path: '/audit',        icon: FileText,         label: 'Audit Logs',   permission: RBAC_PERMISSIONS.AUDIT_READ },
+    { path: '/activity',     icon: Activity,         label: 'Activity',     permission: RBAC_PERMISSIONS.ACTIVITY_READ },
     { path: '/settings',     icon: Settings,         label: 'Settings',     permission: null },
     // Admin panel — only admins will see this
     { path: '/admin',        icon: ShieldCheck,      label: 'Admin Panel',  permission: RBAC_PERMISSIONS.ADMIN_ALL },

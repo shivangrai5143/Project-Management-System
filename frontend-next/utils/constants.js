@@ -207,6 +207,7 @@ export const RBAC_PERMISSIONS = {
     WHITEBOARD_DELETE:'whiteboard.delete',
     ANALYTICS_READ:   'analytics.read',
     AUDIT_READ:       'audit.read',
+    ACTIVITY_READ:    'activity.read',
     ADMIN_ALL:        'admin.all',
 };
 
@@ -227,6 +228,7 @@ export const ROUTE_PERMISSIONS = {
     '/gamification': RBAC_PERMISSIONS.TASKS_READ,
     '/team':         RBAC_PERMISSIONS.TEAM_READ,
     '/audit':        RBAC_PERMISSIONS.AUDIT_READ,
+    '/activity':     RBAC_PERMISSIONS.ACTIVITY_READ,
     '/settings':     null,                              // all authenticated users
     '/admin':        RBAC_PERMISSIONS.ADMIN_ALL,
 };

@@ -62,6 +62,7 @@ export default function ProtectedLayout({ children }) {
         if (pathname === '/integrations')           return 'Integrations';
         if (pathname === '/gamification')           return 'Achievements';
         if (pathname === '/audit')                  return 'Audit Logs';
+        if (pathname === '/activity')               return 'Activity Timeline';
         if (pathname === '/admin')                  return 'Admin Panel';
         if (pathname === '/access-denied')          return 'Access Denied';
         return '';

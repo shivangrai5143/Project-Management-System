@@ -1,6 +1,7 @@
 import * as projectsModel from '../models/firestore/projects.js';
 import { authMiddleware, jsonResponse, errorResponse } from '../lib/auth.js';
 import { hasPermission, PERMISSIONS } from '../lib/rbac.js';
+import { logEvent, ACTIONS } from '../lib/activityLogger.js';
 
 /**
  * Inline permission check helper.
@@ -95,6 +96,19 @@ async function createProject(req, res, userId) {
                 userId,
                 role: 'owner',
             }],
+        });
+
+        // Log activity (non-blocking)
+        logEvent({
+            actorId:    req.user.uid,
+            actorName:  req.user.name,
+            action:     ACTIONS.PROJECT_CREATED,
+            targetId:   project.id,
+            targetType: 'project',
+            targetName: project.name,
+            projectId:  project.id,
+            projectName: project.name,
+            metadata:   { color: project.color, icon: project.icon },
         });
 
         return jsonResponse(res, {
