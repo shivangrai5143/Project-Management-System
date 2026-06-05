@@ -40,7 +40,7 @@ export const AuthProvider = ({ children }) => {
                             email: firebaseUser.email,
                             name: firebaseUser.displayName || firebaseUser.email?.split('@')[0],
                             avatar: firebaseUser.photoURL || null,
-                            role: 'user',
+                            role: 'developer',
                             createdAt: new Date().toISOString(),
                             updatedAt: new Date().toISOString(),
                         };
@@ -94,7 +94,7 @@ export const AuthProvider = ({ children }) => {
                 email: email.toLowerCase(),
                 name,
                 avatar: null,
-                role: 'user',
+                role: 'developer',
                 gitHubUsername: null,
                 standupSettings: {
                     enabled: true,

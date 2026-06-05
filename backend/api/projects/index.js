@@ -1,27 +1,63 @@
 import * as projectsModel from '../models/firestore/projects.js';
 import { authMiddleware, jsonResponse, errorResponse } from '../lib/auth.js';
+import { hasPermission, PERMISSIONS } from '../lib/rbac.js';
+
+/**
+ * Inline permission check helper.
+ * Since these handlers are plain functions (not Express Router handlers),
+ * we perform the check synchronously here instead of using middleware.
+ *
+ * @param {object} req
+ * @param {object} res
+ * @param {string} permission
+ * @param {Function} next
+ */
+function checkPermission(req, res, permission, next) {
+    if (!hasPermission(req.user.role, permission)) {
+        return res.status(403).json({
+            error: 'Forbidden: you do not have permission to perform this action',
+            code: 'INSUFFICIENT_PERMISSIONS',
+            requiredPermission: permission,
+            userRole: req.user.role,
+        });
+    }
+    return next();
+}
+
+// ---------------------------------------------------------------------------
+// Main Handler (for /api/projects — collection-level operations)
+// ---------------------------------------------------------------------------
 
 export default async function handler(req, res) {
-    // Verify authentication for all routes
+    // Authenticate and attach role-enriched user
     const authResult = await authMiddleware(req);
-
     if (authResult.error) {
         return errorResponse(res, authResult.error, authResult.status);
     }
-
+    req.user = authResult.user;
     const userId = authResult.user.uid;
 
     switch (req.method) {
         case 'GET':
-            return getProjects(req, res, userId);
+            // All authenticated users with projects.read can list their projects
+            return checkPermission(req, res, PERMISSIONS.PROJECTS_READ,
+                () => getProjects(req, res, userId)
+            );
+
         case 'POST':
-            return createProject(req, res, userId);
+            // Only admin and project_manager can create projects
+            return checkPermission(req, res, PERMISSIONS.PROJECTS_CREATE,
+                () => createProject(req, res, userId)
+            );
+
         default:
             return errorResponse(res, 'Method not allowed', 405);
     }
 }
 
-// GET /api/projects - Get all projects for user
+// ---------------------------------------------------------------------------
+// GET /api/projects — List projects for the authenticated user
+// ---------------------------------------------------------------------------
 async function getProjects(req, res, userId) {
     try {
         const projects = await projectsModel.getProjectsForUser(userId);
@@ -38,7 +74,9 @@ async function getProjects(req, res, userId) {
     }
 }
 
-// POST /api/projects - Create a new project
+// ---------------------------------------------------------------------------
+// POST /api/projects — Create a new project
+// ---------------------------------------------------------------------------
 async function createProject(req, res, userId) {
     try {
         const { name, description, color, icon } = req.body;
@@ -47,7 +85,6 @@ async function createProject(req, res, userId) {
             return errorResponse(res, 'Project name is required');
         }
 
-        // Create project with owner as first member
         const project = await projectsModel.createProject({
             name: name.trim(),
             description: description || '',

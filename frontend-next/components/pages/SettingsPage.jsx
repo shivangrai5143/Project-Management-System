@@ -2,23 +2,29 @@
 
 import { useState, useRef } from 'react';
 import { useAuth } from '@/context/AuthContext';
+import { useRBAC } from '@/context/RBACContext';
 import { useTheme } from '@/context/ThemeContext';
 import { useStandupBot } from '@/context/StandupBotContext';
 import Card from '@/components/ui/Card';
 import Input from '@/components/ui/Input';
 import Button from '@/components/ui/Button';
 import Avatar from '@/components/ui/Avatar';
-import { User, Mail, Lock, Bell, Palette, Save, Bot, Clock, Sparkles, Camera } from 'lucide-react';
+import RoleBadge from '@/components/ui/RoleBadge';
+import { User, Mail, Lock, Bell, Palette, Save, Bot, Clock, Sparkles, Camera, ShieldCheck } from 'lucide-react';
 import Github from '@/components/ui/GithubIcon';
 import { connectGitHub, disconnectGitHub, isGitHubConnected, getGitHubUsername } from '@/utils/githubSimulator';
+import { USER_ROLE_CONFIG } from '@/utils/constants';
+
 
 const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB
 
 const SettingsPage = () => {
     const { user, updateProfile } = useAuth();
+    const { userRole } = useRBAC();
     const { isDark, toggleTheme } = useTheme();
     const { settings, updateSettings, triggerStandup } = useStandupBot();
     const fileInputRef = useRef(null);
+
 
     const [formData, setFormData] = useState({
         name: user?.name || '',
@@ -133,6 +139,26 @@ const SettingsPage = () => {
                             Save Changes
                         </Button>
                     </div>
+                </div>
+
+                {/* Role information */}
+                <div className="mt-6 pt-6 border-t border-slate-700/50">
+                    <h3 className="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
+                        <ShieldCheck className="w-4 h-4 text-slate-400" />
+                        Your Role & Permissions
+                    </h3>
+                    <div className="flex items-start gap-3 p-3 rounded-xl bg-slate-800/50 border border-slate-700/50">
+                        <RoleBadge role={userRole} size="md" />
+                        <div className="flex-1">
+                            <p className="text-xs text-slate-400 mt-0.5">
+                                {USER_ROLE_CONFIG[userRole]?.description ||
+                                    'Contact your administrator to change your role.'}
+                            </p>
+                        </div>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-2">
+                        Role changes can only be made by an administrator.
+                    </p>
                 </div>
             </Card>
 

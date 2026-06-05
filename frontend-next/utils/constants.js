@@ -99,7 +99,7 @@ export const PROJECT_COLORS = [
     '#fc5c7d',
 ];
 
-// Team roles
+// Team roles (project-level membership roles — used inside projects.members[])
 export const TEAM_ROLES = {
     OWNER: 'owner',
     ADMIN: 'admin',
@@ -128,6 +128,107 @@ export const ROLE_CONFIG = {
         color: '#64748b',
         permissions: ['view'],
     },
+};
+
+// ---------------------------------------------------------------------------
+// RBAC — System-level user roles
+// ---------------------------------------------------------------------------
+
+/** The 4 system roles for RBAC */
+export const USER_ROLES = {
+    ADMIN:           'admin',
+    PROJECT_MANAGER: 'project_manager',
+    DEVELOPER:       'developer',
+    CLIENT:          'client',
+};
+
+/** Display config per role — used in badges, selectors, and the admin panel */
+export const USER_ROLE_CONFIG = {
+    [USER_ROLES.ADMIN]: {
+        label:       'Admin',
+        description: 'Full system access — can manage roles, delete projects, view audit logs',
+        color:       '#8b5cf6',   // purple
+        bgColor:     'bg-purple-500/20',
+        textColor:   'text-purple-400',
+        borderColor: 'border-purple-500/30',
+        icon:        'Shield',
+    },
+    [USER_ROLES.PROJECT_MANAGER]: {
+        label:       'Project Manager',
+        description: 'Can create/manage projects and invite team members',
+        color:       '#3b82f6',   // blue
+        bgColor:     'bg-blue-500/20',
+        textColor:   'text-blue-400',
+        borderColor: 'border-blue-500/30',
+        icon:        'Briefcase',
+    },
+    [USER_ROLES.DEVELOPER]: {
+        label:       'Developer',
+        description: 'Can create and update tasks; view projects and team',
+        color:       '#10b981',   // green
+        bgColor:     'bg-emerald-500/20',
+        textColor:   'text-emerald-400',
+        borderColor: 'border-emerald-500/30',
+        icon:        'Code2',
+    },
+    [USER_ROLES.CLIENT]: {
+        label:       'Client',
+        description: 'Read-only view of project progress',
+        color:       '#f59e0b',   // amber
+        bgColor:     'bg-amber-500/20',
+        textColor:   'text-amber-400',
+        borderColor: 'border-amber-500/30',
+        icon:        'Eye',
+    },
+};
+
+// ---------------------------------------------------------------------------
+// RBAC — Permission strings (mirror of backend/api/lib/rbac.js)
+// ---------------------------------------------------------------------------
+
+export const RBAC_PERMISSIONS = {
+    PROJECTS_CREATE:  'projects.create',
+    PROJECTS_READ:    'projects.read',
+    PROJECTS_UPDATE:  'projects.update',
+    PROJECTS_DELETE:  'projects.delete',
+    TASKS_CREATE:     'tasks.create',
+    TASKS_READ:       'tasks.read',
+    TASKS_UPDATE:     'tasks.update',
+    TASKS_DELETE:     'tasks.delete',
+    USERS_READ:       'users.read',
+    USERS_UPDATE:     'users.update',
+    USERS_MANAGE:     'users.manage',
+    TEAM_READ:        'team.read',
+    TEAM_INVITE:      'team.invite',
+    STANDUPS_READ:    'standups.read',
+    STANDUPS_CREATE:  'standups.create',
+    WHITEBOARD_READ:  'whiteboard.read',
+    WHITEBOARD_WRITE: 'whiteboard.write',
+    WHITEBOARD_DELETE:'whiteboard.delete',
+    ANALYTICS_READ:   'analytics.read',
+    AUDIT_READ:       'audit.read',
+    ADMIN_ALL:        'admin.all',
+};
+
+/**
+ * Route path → required permission.
+ * Used by RoleGuard to determine whether a user can access a page.
+ */
+export const ROUTE_PERMISSIONS = {
+    '/dashboard':    null,                              // all authenticated users
+    '/projects':     RBAC_PERMISSIONS.PROJECTS_READ,
+    '/tasks':        RBAC_PERMISSIONS.TASKS_READ,
+    '/analytics':    RBAC_PERMISSIONS.ANALYTICS_READ,
+    '/sprints':      RBAC_PERMISSIONS.TASKS_READ,
+    '/bugs':         RBAC_PERMISSIONS.TASKS_READ,
+    '/automation':   RBAC_PERMISSIONS.PROJECTS_UPDATE,
+    '/knowledge':    RBAC_PERMISSIONS.PROJECTS_READ,
+    '/integrations': RBAC_PERMISSIONS.PROJECTS_UPDATE,
+    '/gamification': RBAC_PERMISSIONS.TASKS_READ,
+    '/team':         RBAC_PERMISSIONS.TEAM_READ,
+    '/audit':        RBAC_PERMISSIONS.AUDIT_READ,
+    '/settings':     null,                              // all authenticated users
+    '/admin':        RBAC_PERMISSIONS.ADMIN_ALL,
 };
 
 // Notification types

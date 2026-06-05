@@ -21,33 +21,52 @@ import {
     Trophy,
     FileText,
     Timer,
+    ShieldCheck,
 } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
+import { useRBAC } from '@/context/RBACContext';
 import { useAIAgent } from '@/context/AIAgentContext';
 import Avatar from '@/components/ui/Avatar';
+import RoleBadge from '@/components/ui/RoleBadge';
+import { RBAC_PERMISSIONS } from '@/utils/constants';
+
+/**
+ * Nav item definition.
+ *   path        — route href
+ *   icon        — Lucide icon component
+ *   label       — display text
+ *   permission  — RBAC_PERMISSIONS.* value; null = visible to all logged-in users
+ */
+const NAV_ITEMS = [
+    { path: '/dashboard',    icon: LayoutDashboard, label: 'Dashboard',    permission: null },
+    { path: '/projects',     icon: FolderKanban,    label: 'Projects',     permission: RBAC_PERMISSIONS.PROJECTS_READ },
+    { path: '/tasks',        icon: CheckSquare,      label: 'My Tasks',     permission: RBAC_PERMISSIONS.TASKS_READ },
+    { path: '/analytics',    icon: BarChart3,        label: 'Analytics',    permission: RBAC_PERMISSIONS.ANALYTICS_READ },
+    { path: '/sprints',      icon: Timer,            label: 'Sprints',      permission: RBAC_PERMISSIONS.TASKS_READ },
+    { path: '/bugs',         icon: Bug,              label: 'Bug Tracker',  permission: RBAC_PERMISSIONS.TASKS_READ },
+    { path: '/automation',   icon: Zap,              label: 'Automation',   permission: RBAC_PERMISSIONS.PROJECTS_UPDATE },
+    { path: '/knowledge',    icon: BookOpen,         label: 'Knowledge',    permission: RBAC_PERMISSIONS.PROJECTS_READ },
+    { path: '/integrations', icon: GitBranch,        label: 'Integrations', permission: RBAC_PERMISSIONS.PROJECTS_UPDATE },
+    { path: '/gamification', icon: Trophy,           label: 'Achievements', permission: RBAC_PERMISSIONS.TASKS_READ },
+    { path: '/team',         icon: Users,            label: 'Team',         permission: RBAC_PERMISSIONS.TEAM_READ },
+    { path: '/audit',        icon: FileText,         label: 'Audit Logs',   permission: RBAC_PERMISSIONS.AUDIT_READ },
+    { path: '/settings',     icon: Settings,         label: 'Settings',     permission: null },
+    // Admin panel — only admins will see this
+    { path: '/admin',        icon: ShieldCheck,      label: 'Admin Panel',  permission: RBAC_PERMISSIONS.ADMIN_ALL },
+];
 
 const Sidebar = () => {
     const [isCollapsed, setIsCollapsed] = useState(false);
     const { user, logout } = useAuth();
+    const { hasPermission, userRole } = useRBAC();
     const { openPanel } = useAIAgent();
     const pathname = usePathname();
 
-    const navItems = [
-        { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-        { path: '/projects', icon: FolderKanban, label: 'Projects' },
-        { path: '/tasks', icon: CheckSquare, label: 'My Tasks' },
-        { path: '/analytics', icon: BarChart3, label: 'Analytics' },
-        { path: '/sprints', icon: Timer, label: 'Sprints' },
-        { path: '/bugs', icon: Bug, label: 'Bug Tracker' },
-        { path: '/automation', icon: Zap, label: 'Automation' },
-        { path: '/knowledge', icon: BookOpen, label: 'Knowledge' },
-        { path: '/integrations', icon: GitBranch, label: 'Integrations' },
-        { path: '/gamification', icon: Trophy, label: 'Achievements' },
-        { path: '/team', icon: Users, label: 'Team' },
-        { path: '/audit', icon: FileText, label: 'Audit Logs' },
-        { path: '/settings', icon: Settings, label: 'Settings' },
-    ];
+    // Filter nav items by the user's permissions
+    const visibleNavItems = NAV_ITEMS.filter(
+        item => item.permission === null || hasPermission(item.permission)
+    );
 
     const isActive = (path) => {
         if (path === '/dashboard') return pathname === '/dashboard';
@@ -57,12 +76,12 @@ const Sidebar = () => {
     return (
         <aside
             className={`
-        fixed left-0 top-0 h-screen z-40
-        bg-slate-900 border-r border-slate-800
-        flex flex-col
-        transition-all duration-300 ease-out
-        ${isCollapsed ? 'w-20' : 'w-64'}
-      `}
+                fixed left-0 top-0 h-screen z-40
+                bg-slate-900 border-r border-slate-800
+                flex flex-col
+                transition-all duration-300 ease-out
+                ${isCollapsed ? 'w-20' : 'w-64'}
+            `}
         >
             {/* Logo */}
             <div className="h-16 flex items-center justify-between px-4 border-b border-slate-800 flex-shrink-0">
@@ -79,10 +98,10 @@ const Sidebar = () => {
                 <button
                     onClick={() => setIsCollapsed(!isCollapsed)}
                     className={`
-            p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800
-            transition-colors flex-shrink-0
-            ${isCollapsed ? 'absolute -right-3 top-6 bg-slate-800 border border-slate-700 shadow-lg' : ''}
-          `}
+                        p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800
+                        transition-colors flex-shrink-0
+                        ${isCollapsed ? 'absolute -right-3 top-6 bg-slate-800 border border-slate-700 shadow-lg' : ''}
+                    `}
                 >
                     {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
                 </button>
@@ -90,19 +109,19 @@ const Sidebar = () => {
 
             {/* Navigation */}
             <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
-                {navItems.map(item => (
+                {visibleNavItems.map(item => (
                     <Link
                         key={item.path}
                         href={item.path}
                         className={`
-              flex items-center gap-3 px-3 py-2.5 rounded-xl
-              transition-all duration-200
-              ${isActive(item.path)
+                            flex items-center gap-3 px-3 py-2.5 rounded-xl
+                            transition-all duration-200
+                            ${isActive(item.path)
                                 ? 'bg-gradient-to-r from-indigo-500/20 to-purple-500/20 text-white border border-indigo-500/30'
                                 : 'text-slate-400 hover:text-white hover:bg-slate-800'
                             }
-              ${isCollapsed ? 'justify-center' : ''}
-            `}
+                            ${isCollapsed ? 'justify-center' : ''}
+                        `}
                         title={isCollapsed ? item.label : undefined}
                     >
                         <item.icon className="w-5 h-5 flex-shrink-0" />
@@ -136,6 +155,10 @@ const Sidebar = () => {
                         <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium text-white truncate">{user?.name}</p>
                             <p className="text-xs text-slate-400 truncate">{user?.email}</p>
+                            {/* Role badge — shown below the user's email */}
+                            <div className="mt-1">
+                                <RoleBadge role={userRole} size="sm" />
+                            </div>
                         </div>
                     )}
                     {!isCollapsed && (

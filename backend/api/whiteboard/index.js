@@ -1,5 +1,6 @@
 import * as whiteboardsModel from '../models/firestore/whiteboards.js';
-import { verifyFirebaseToken } from '../lib/auth.js';
+import { verifyFirebaseToken, authMiddleware } from '../lib/auth.js';
+import { hasPermission, PERMISSIONS } from '../lib/rbac.js';
 
 export default async function handler(req, res) {
     // Enable CORS
@@ -13,36 +14,38 @@ export default async function handler(req, res) {
     }
 
     try {
-        // Verify authentication
-        const authHeader = req.headers.authorization;
-        if (!authHeader || !authHeader.startsWith('Bearer ')) {
-            return res.status(401).json({ error: 'Unauthorized' });
+        // Authenticate and attach role-enriched user
+        const authResult = await authMiddleware(req);
+        if (authResult.error) {
+            return res.status(authResult.status || 401).json({ error: authResult.error });
         }
 
-        const token = authHeader.split(' ')[1];
-        const decoded = await verifyFirebaseToken(token);
-        if (!decoded) {
-            return res.status(401).json({ error: 'Invalid token' });
-        }
-
+        const user = authResult.user;
         const { projectId } = req.query;
 
         if (!projectId) {
             return res.status(400).json({ error: 'Project ID is required' });
         }
 
-        // GET - Fetch all elements for a project
+        // -----------------------------------------------------------------------
+        // GET — fetch whiteboard elements (requires whiteboard.read)
+        // -----------------------------------------------------------------------
         if (req.method === 'GET') {
+            if (!hasPermission(user.role, PERMISSIONS.WHITEBOARD_READ)) {
+                return res.status(403).json({
+                    error: 'Forbidden: whiteboard read access required',
+                    code: 'INSUFFICIENT_PERMISSIONS',
+                    userRole: user.role,
+                });
+            }
+
             const { since, lastCleared: clientLastCleared } = req.query;
 
             let whiteboard = await whiteboardsModel.getWhiteboardByProject(projectId);
-
             if (!whiteboard) {
-                // Create empty whiteboard if doesn't exist
                 whiteboard = await whiteboardsModel.createWhiteboard(projectId);
             }
 
-            // Check if board was cleared after client's last known clear time
             const serverLastCleared = whiteboard.lastCleared ? new Date(whiteboard.lastCleared).getTime() : 0;
             const clientClearedTime = clientLastCleared ? parseInt(clientLastCleared) : 0;
             const boardWasCleared = serverLastCleared > clientClearedTime;
@@ -52,7 +55,6 @@ export default async function handler(req, res) {
             let texts = whiteboard.texts || [];
             let stickyNotes = whiteboard.stickyNotes || [];
 
-            // If client has a 'since' timestamp and board wasn't cleared, send only new elements
             if (since && !boardWasCleared) {
                 const sinceDate = new Date(parseInt(since));
                 strokes = strokes.filter(s => new Date(s.createdAt) > sinceDate);
@@ -68,26 +70,41 @@ export default async function handler(req, res) {
                 stickyNotes,
                 lastCleared: whiteboard.lastCleared ? new Date(whiteboard.lastCleared).getTime() : null,
                 version: whiteboard.version,
-                boardWasCleared
+                boardWasCleared,
             });
         }
 
-        // POST - Add new elements
+        // -----------------------------------------------------------------------
+        // POST — add new elements or clear board (requires whiteboard.write)
+        // -----------------------------------------------------------------------
         if (req.method === 'POST') {
-            const { strokes, shapes, texts, stickyNotes, action } = req.body;
-
-            if (action === 'clear') {
-                // Clear the whiteboard
-                const whiteboard = await whiteboardsModel.clearWhiteboard(projectId);
-
-                return res.status(200).json({
-                    success: true,
-                    lastCleared: whiteboard.lastCleared ? new Date(whiteboard.lastCleared).getTime() : null,
-                    version: whiteboard.version
+            if (!hasPermission(user.role, PERMISSIONS.WHITEBOARD_WRITE)) {
+                return res.status(403).json({
+                    error: 'Forbidden: whiteboard write access required',
+                    code: 'INSUFFICIENT_PERMISSIONS',
+                    userRole: user.role,
                 });
             }
 
-            // Get current whiteboard or create if doesn't exist
+            const { strokes, shapes, texts, stickyNotes, action } = req.body;
+
+            if (action === 'clear') {
+                // Clear requires whiteboard.delete
+                if (!hasPermission(user.role, PERMISSIONS.WHITEBOARD_DELETE)) {
+                    return res.status(403).json({
+                        error: 'Forbidden: whiteboard delete access required',
+                        code: 'INSUFFICIENT_PERMISSIONS',
+                        userRole: user.role,
+                    });
+                }
+                const whiteboard = await whiteboardsModel.clearWhiteboard(projectId);
+                return res.status(200).json({
+                    success: true,
+                    lastCleared: whiteboard.lastCleared ? new Date(whiteboard.lastCleared).getTime() : null,
+                    version: whiteboard.version,
+                });
+            }
+
             let whiteboard = await whiteboardsModel.getWhiteboardByProject(projectId);
             if (!whiteboard) {
                 whiteboard = await whiteboardsModel.createWhiteboard(projectId);
@@ -98,62 +115,35 @@ export default async function handler(req, res) {
                 updatedAt: new Date().toISOString(),
             };
 
-            // Handle strokes
-            if (strokes && Array.isArray(strokes) && strokes.length > 0) {
-                const strokesWithUser = strokes.map(stroke => ({
-                    ...stroke,
-                    userId: decoded.uid,
-                    userName: decoded.name || decoded.email || 'Unknown',
-                    createdAt: new Date().toISOString()
-                }));
-                updates.strokes = [...(whiteboard.strokes || []), ...strokesWithUser];
-            }
+            const addUserMeta = items => items.map(item => ({
+                ...item,
+                userId: user.uid,
+                userName: user.name || user.email || 'Unknown',
+                createdAt: new Date().toISOString(),
+            }));
 
-            // Handle shapes
-            if (shapes && Array.isArray(shapes) && shapes.length > 0) {
-                const shapesWithUser = shapes.map(shape => ({
-                    ...shape,
-                    userId: decoded.uid,
-                    userName: decoded.name || decoded.email || 'Unknown',
-                    createdAt: new Date().toISOString()
-                }));
-                updates.shapes = [...(whiteboard.shapes || []), ...shapesWithUser];
-            }
-
-            // Handle texts
-            if (texts && Array.isArray(texts) && texts.length > 0) {
-                const textsWithUser = texts.map(text => ({
-                    ...text,
-                    userId: decoded.uid,
-                    userName: decoded.name || decoded.email || 'Unknown',
-                    createdAt: new Date().toISOString()
-                }));
-                updates.texts = [...(whiteboard.texts || []), ...textsWithUser];
-            }
-
-            // Handle sticky notes
-            if (stickyNotes && Array.isArray(stickyNotes) && stickyNotes.length > 0) {
-                const notesWithUser = stickyNotes.map(note => ({
-                    ...note,
-                    userId: decoded.uid,
-                    userName: decoded.name || decoded.email || 'Unknown',
-                    createdAt: new Date().toISOString()
-                }));
-                updates.stickyNotes = [...(whiteboard.stickyNotes || []), ...notesWithUser];
-            }
+            if (strokes?.length)     updates.strokes     = [...(whiteboard.strokes     || []), ...addUserMeta(strokes)];
+            if (shapes?.length)      updates.shapes      = [...(whiteboard.shapes      || []), ...addUserMeta(shapes)];
+            if (texts?.length)       updates.texts       = [...(whiteboard.texts       || []), ...addUserMeta(texts)];
+            if (stickyNotes?.length) updates.stickyNotes = [...(whiteboard.stickyNotes || []), ...addUserMeta(stickyNotes)];
 
             whiteboard = await whiteboardsModel.updateWhiteboard(projectId, updates);
-
-            return res.status(200).json({
-                success: true,
-                version: whiteboard.version
-            });
+            return res.status(200).json({ success: true, version: whiteboard.version });
         }
 
-        // PUT - Update existing element (for sticky note content, moving elements)
+        // -----------------------------------------------------------------------
+        // PUT — update an existing element (requires whiteboard.write)
+        // -----------------------------------------------------------------------
         if (req.method === 'PUT') {
-            const { elementType, elementId, updates } = req.body;
+            if (!hasPermission(user.role, PERMISSIONS.WHITEBOARD_WRITE)) {
+                return res.status(403).json({
+                    error: 'Forbidden: whiteboard write access required',
+                    code: 'INSUFFICIENT_PERMISSIONS',
+                    userRole: user.role,
+                });
+            }
 
+            const { elementType, elementId, updates } = req.body;
             if (!elementType || !elementId || !updates) {
                 return res.status(400).json({ error: 'elementType, elementId, and updates are required' });
             }
@@ -163,69 +153,57 @@ export default async function handler(req, res) {
                 return res.status(404).json({ error: 'Whiteboard not found' });
             }
 
-            const fieldMap = {
-                stroke: 'strokes',
-                shape: 'shapes',
-                text: 'texts',
-                stickyNote: 'stickyNotes'
-            };
-
-            const idFieldMap = {
-                stroke: 'strokeId',
-                shape: 'shapeId',
-                text: 'textId',
-                stickyNote: 'noteId'
-            };
-
-            const field = fieldMap[elementType];
+            const fieldMap   = { stroke: 'strokes', shape: 'shapes', text: 'texts', stickyNote: 'stickyNotes' };
+            const idFieldMap = { stroke: 'strokeId', shape: 'shapeId', text: 'textId', stickyNote: 'noteId' };
+            const field   = fieldMap[elementType];
             const idField = idFieldMap[elementType];
 
             if (!field) {
                 return res.status(400).json({ error: 'Invalid element type' });
             }
 
-            // Update the specific element
             const elements = whiteboard[field] || [];
             const updatedElements = elements.map(elem =>
                 elem[idField] === elementId ? { ...elem, ...updates } : elem
             );
 
-            const updatedWhiteboard = await whiteboardsModel.updateWhiteboard(projectId, {
-                [field]: updatedElements
-            });
-
-            return res.status(200).json({
-                success: true,
-                version: updatedWhiteboard.version
-            });
+            const updatedWhiteboard = await whiteboardsModel.updateWhiteboard(projectId, { [field]: updatedElements });
+            return res.status(200).json({ success: true, version: updatedWhiteboard.version });
         }
 
-        // DELETE - Clear board or delete specific element
+        // -----------------------------------------------------------------------
+        // DELETE — remove element or clear board (requires whiteboard.delete)
+        // -----------------------------------------------------------------------
         if (req.method === 'DELETE') {
-            const { elementType, elementId } = req.query;
-
-            // If no specific element, clear entire board
-            if (!elementType || !elementId) {
-                const whiteboard = await whiteboardsModel.clearWhiteboard(projectId);
-
-                return res.status(200).json({
-                    success: true,
-                    lastCleared: whiteboard.lastCleared ? new Date(whiteboard.lastCleared).getTime() : null,
-                    version: whiteboard.version
+            if (!hasPermission(user.role, PERMISSIONS.WHITEBOARD_DELETE)) {
+                return res.status(403).json({
+                    error: 'Forbidden: whiteboard delete access required',
+                    code: 'INSUFFICIENT_PERMISSIONS',
+                    userRole: user.role,
                 });
             }
 
-            // Delete specific element
+            const { elementType, elementId } = req.query;
+
+            if (!elementType || !elementId) {
+                const whiteboard = await whiteboardsModel.clearWhiteboard(projectId);
+                return res.status(200).json({
+                    success: true,
+                    lastCleared: whiteboard.lastCleared ? new Date(whiteboard.lastCleared).getTime() : null,
+                    version: whiteboard.version,
+                });
+            }
+
             const whiteboard = await whiteboardsModel.getWhiteboardByProject(projectId);
             if (!whiteboard) {
                 return res.status(404).json({ error: 'Whiteboard not found' });
             }
 
             const fieldMap = {
-                stroke: { field: 'strokes', idField: 'strokeId' },
-                shape: { field: 'shapes', idField: 'shapeId' },
-                text: { field: 'texts', idField: 'textId' },
-                stickyNote: { field: 'stickyNotes', idField: 'noteId' }
+                stroke:     { field: 'strokes',     idField: 'strokeId' },
+                shape:      { field: 'shapes',      idField: 'shapeId' },
+                text:       { field: 'texts',       idField: 'textId' },
+                stickyNote: { field: 'stickyNotes', idField: 'noteId' },
             };
 
             const config = fieldMap[elementType];
@@ -233,18 +211,13 @@ export default async function handler(req, res) {
                 return res.status(400).json({ error: 'Invalid element type' });
             }
 
-            // Filter out the element to delete
             const elements = whiteboard[config.field] || [];
             const filteredElements = elements.filter(elem => elem[config.idField] !== elementId);
-
             const updatedWhiteboard = await whiteboardsModel.updateWhiteboard(projectId, {
-                [config.field]: filteredElements
+                [config.field]: filteredElements,
             });
 
-            return res.status(200).json({
-                success: true,
-                version: updatedWhiteboard?.version || 0
-            });
+            return res.status(200).json({ success: true, version: updatedWhiteboard?.version || 0 });
         }
 
         return res.status(405).json({ error: 'Method not allowed' });
