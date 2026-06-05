@@ -156,5 +156,24 @@ service cloud.firestore {
       // Delete: admin or PM only
       allow delete: if isAdminOrPM();
     }
+
+    // -------------------------------------------------------------------------
+    // Activity Logs collection
+    // Append-only event store — no client-SDK updates or deletes allowed.
+    // -------------------------------------------------------------------------
+    match /activityLogs/{logId} {
+      // Non-client roles (admin, PM, developer) can read the timeline
+      allow read: if isNotClient();
+
+      // Any non-client user can create (append) a log entry
+      // (e.g. frontend direct writes for comment.added, file.uploaded, sprint.created)
+      allow create: if isNotClient()
+        && request.resource.data.keys().hasAll(['actorId', 'action', 'targetId', 'createdAt'])
+        && request.resource.data.actorId == request.auth.uid;
+
+      // No client-SDK updates or deletes — logs are immutable
+      allow update: if false;
+      allow delete: if isAdmin();   // admin-only cleanup
+    }
   }
 }

@@ -99,6 +99,11 @@ app.put('/api/whiteboard',     (req, res) => whiteboardHandler(req, res));
 app.delete('/api/whiteboard',  (req, res) => whiteboardHandler(req, res));
 app.options('/api/whiteboard', (req, res) => whiteboardHandler(req, res));
 
+// ============ ACTIVITY ROUTES ============
+import activityHandler from './api/activity/index.js';
+
+app.get('/api/activity', (req, res) => activityHandler(req, res));
+
 // Start server
 app.listen(PORT, () => {
     console.log(`🚀 Backend server running on port ${PORT}`);

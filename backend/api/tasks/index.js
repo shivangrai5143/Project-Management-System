@@ -1,6 +1,7 @@
 import * as tasksModel from '../models/firestore/tasks.js';
 import { authMiddleware, jsonResponse, errorResponse } from '../lib/auth.js';
 import { hasPermission, PERMISSIONS } from '../lib/rbac.js';
+import { logEvent, ACTIONS } from '../lib/activityLogger.js';
 
 /** Inline permission guard. */
 function checkPermission(req, res, permission, next) {
@@ -114,6 +115,32 @@ async function createTask(req, res, userId) {
             order: newOrder,
         });
 
+        // Log activity (non-blocking)
+        logEvent({
+            actorId:     req.user.uid,
+            actorName:   req.user.name,
+            action:      ACTIONS.TASK_CREATED,
+            targetId:    task.id,
+            targetType:  'task',
+            targetName:  task.title,
+            projectId:   task.projectId || null,
+            metadata:    { priority: task.priority, status: task.status },
+        });
+
+        // If assignee set on creation, log that too
+        if (task.assigneeId) {
+            logEvent({
+                actorId:     req.user.uid,
+                actorName:   req.user.name,
+                action:      ACTIONS.TASK_ASSIGNED,
+                targetId:    task.id,
+                targetType:  'task',
+                targetName:  task.title,
+                projectId:   task.projectId || null,
+                metadata:    { assigneeId: task.assigneeId },
+            });
+        }
+
         return jsonResponse(res, {
             success: true,
             task,
@@ -152,6 +179,39 @@ async function updateTask(req, res, userId) {
         });
 
         const updatedTask = await tasksModel.updateTask(taskId, updateData);
+
+        // Log activity events based on what changed (non-blocking)
+        const prevAssignee = task.assigneeId;
+        const newAssignee  = updateData.assigneeId;
+        const newStatus    = updateData.status;
+
+        if (newAssignee !== undefined && newAssignee !== prevAssignee) {
+            logEvent({
+                actorId:    req.user.uid,
+                actorName:  req.user.name,
+                action:     ACTIONS.TASK_ASSIGNED,
+                targetId:   taskId,
+                targetType: 'task',
+                targetName: updatedTask.title,
+                projectId:  updatedTask.projectId || null,
+                metadata:   { assigneeId: newAssignee, prevAssigneeId: prevAssignee },
+            });
+        }
+
+        if (newStatus === 'done' && task.status !== 'done') {
+            logEvent({
+                actorId:    req.user.uid,
+                actorName:  req.user.name,
+                action:     ACTIONS.TASK_COMPLETED,
+                targetId:   taskId,
+                targetType: 'task',
+                targetName: updatedTask.title,
+                projectId:  updatedTask.projectId || null,
+                metadata:   { previousStatus: task.status },
+            });
+        } else if (newStatus && newStatus !== task.status && newStatus !== 'done') {
+            // General status change — log as update but only if not already covered
+        }
 
         return jsonResponse(res, {
             success: true,

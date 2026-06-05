@@ -10,6 +10,7 @@ import { ChatProvider } from '@/context/ChatContext';
 import { StandupBotProvider } from '@/context/StandupBotContext';
 import { AIAgentProvider } from '@/context/AIAgentContext';
 import { WhiteboardProvider } from '@/context/WhiteboardContext';
+import { ActivityProvider } from '@/context/ActivityContext';
 
 export function Providers({ children }) {
     return (
@@ -24,7 +25,9 @@ export function Providers({ children }) {
                                     <StandupBotProvider>
                                         <AIAgentProvider>
                                             <WhiteboardProvider>
-                                                {children}
+                                                <ActivityProvider>
+                                                    {children}
+                                                </ActivityProvider>
                                             </WhiteboardProvider>
                                         </AIAgentProvider>
                                     </StandupBotProvider>

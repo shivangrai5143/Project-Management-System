@@ -1,6 +1,7 @@
 import * as projectsModel from '../models/firestore/projects.js';
 import { authMiddleware, jsonResponse, errorResponse } from '../lib/auth.js';
 import { hasPermission, PERMISSIONS } from '../lib/rbac.js';
+import { logEvent, ACTIONS } from '../lib/activityLogger.js';
 
 /**
  * Inline permission guard.
@@ -96,6 +97,20 @@ async function updateProject(req, res, projectId) {
         });
 
         const updatedProject = await projectsModel.updateProject(projectId, updates);
+
+        // Log activity (non-blocking)
+        logEvent({
+            actorId:    req.user.uid,
+            actorName:  req.user.name,
+            action:     ACTIONS.PROJECT_UPDATED,
+            targetId:   projectId,
+            targetType: 'project',
+            targetName: updatedProject.name,
+            projectId:  projectId,
+            projectName: updatedProject.name,
+            metadata:   { updatedFields: Object.keys(updates) },
+        });
+
         return jsonResponse(res, {
             success: true,
             project: updatedProject,

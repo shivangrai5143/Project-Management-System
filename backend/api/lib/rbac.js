@@ -77,6 +77,9 @@ export const PERMISSIONS = {
     ANALYTICS_READ: 'analytics.read',
     AUDIT_READ:     'audit.read',
 
+    // Activity Timeline
+    ACTIVITY_READ:  'activity.read',
+
     // Catch-all for admin-only operations
     ADMIN_ALL: 'admin.all',
 };
@@ -116,6 +119,7 @@ const ROLE_PERMISSIONS = {
         PERMISSIONS.WHITEBOARD_DELETE,
 
         PERMISSIONS.ANALYTICS_READ,
+        PERMISSIONS.ACTIVITY_READ,
     ],
 
     [ROLES.DEVELOPER]: [
@@ -134,6 +138,8 @@ const ROLE_PERMISSIONS = {
 
         PERMISSIONS.WHITEBOARD_READ,
         PERMISSIONS.WHITEBOARD_WRITE,
+
+        PERMISSIONS.ACTIVITY_READ,
     ],
 
     [ROLES.CLIENT]: [
