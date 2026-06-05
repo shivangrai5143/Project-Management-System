@@ -1,28 +1,49 @@
 import * as standupsModel from '../models/firestore/standups.js';
 import * as usersModel from '../models/firestore/users.js';
 import { authMiddleware, jsonResponse, errorResponse } from '../lib/auth.js';
+import { hasPermission, PERMISSIONS } from '../lib/rbac.js';
+
+/** Inline permission guard. */
+function checkPermission(req, res, permission, next) {
+    if (!hasPermission(req.user.role, permission)) {
+        return res.status(403).json({
+            error: 'Forbidden: you do not have permission to perform this action',
+            code: 'INSUFFICIENT_PERMISSIONS',
+            requiredPermission: permission,
+            userRole: req.user.role,
+        });
+    }
+    return next();
+}
 
 export default async function handler(req, res) {
-    // Verify authentication for all routes
+    // Authenticate and attach role-enriched user
     const authResult = await authMiddleware(req);
-
     if (authResult.error) {
         return errorResponse(res, authResult.error, authResult.status);
     }
-
+    req.user = authResult.user;
     const userId = authResult.user.uid;
 
     switch (req.method) {
         case 'GET':
-            return getStandups(req, res, userId);
+            return checkPermission(req, res, PERMISSIONS.STANDUPS_READ,
+                () => getStandups(req, res, userId)
+            );
+
         case 'POST':
-            return createStandup(req, res, userId, authResult.user.name);
+            return checkPermission(req, res, PERMISSIONS.STANDUPS_CREATE,
+                () => createStandup(req, res, userId, authResult.user.name)
+            );
+
         default:
             return errorResponse(res, 'Method not allowed', 405);
     }
 }
 
-// GET /api/standups - Get user's standup history
+// ---------------------------------------------------------------------------
+// GET /api/standups — Get standup history for the user
+// ---------------------------------------------------------------------------
 async function getStandups(req, res, userId) {
     try {
         const { limit = 30, today } = req.query;
@@ -37,7 +58,6 @@ async function getStandups(req, res, userId) {
         }
 
         const standups = await standupsModel.getStandupHistory(userId, parseInt(limit));
-
         return jsonResponse(res, {
             success: true,
             standups,
@@ -50,7 +70,9 @@ async function getStandups(req, res, userId) {
     }
 }
 
-// POST /api/standups - Submit a standup
+// ---------------------------------------------------------------------------
+// POST /api/standups — Submit a daily standup
+// ---------------------------------------------------------------------------
 async function createStandup(req, res, userId, userName) {
     try {
         const { response, selectedSuggestions, allSuggestions, projectId, mood, blockers } = req.body;
@@ -59,20 +81,19 @@ async function createStandup(req, res, userId, userName) {
             return errorResponse(res, 'Standup response is required');
         }
 
-        // Check if already submitted today
+        // Prevent duplicate submission
         const existingStandup = await standupsModel.getTodayStandup(userId);
         if (existingStandup) {
             return errorResponse(res, 'You have already submitted a standup today');
         }
 
-        // Get user name if not provided
+        // Resolve user name if not passed via token
         let standupUserName = userName;
         if (!standupUserName) {
             const user = await usersModel.getUser(userId);
             standupUserName = user?.name || user?.email || 'Unknown';
         }
 
-        // Create standup
         const standup = await standupsModel.createStandup({
             userId,
             userName: standupUserName,

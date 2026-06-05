@@ -2,6 +2,7 @@
 
 import { ThemeProvider } from '@/context/ThemeContext';
 import { AuthProvider } from '@/context/AuthContext';
+import { RBACProvider } from '@/context/RBACContext';
 import { ProjectProvider } from '@/context/ProjectContext';
 import { TaskProvider } from '@/context/TaskContext';
 import { NotificationProvider } from '@/context/NotificationContext';
@@ -14,21 +15,24 @@ export function Providers({ children }) {
     return (
         <ThemeProvider>
             <AuthProvider>
-                <ProjectProvider>
-                    <TaskProvider>
-                        <NotificationProvider>
-                            <ChatProvider>
-                                <StandupBotProvider>
-                                    <AIAgentProvider>
-                                        <WhiteboardProvider>
-                                            {children}
-                                        </WhiteboardProvider>
-                                    </AIAgentProvider>
-                                </StandupBotProvider>
-                            </ChatProvider>
-                        </NotificationProvider>
-                    </TaskProvider>
-                </ProjectProvider>
+                {/* RBACProvider must be inside AuthProvider to read user.role */}
+                <RBACProvider>
+                    <ProjectProvider>
+                        <TaskProvider>
+                            <NotificationProvider>
+                                <ChatProvider>
+                                    <StandupBotProvider>
+                                        <AIAgentProvider>
+                                            <WhiteboardProvider>
+                                                {children}
+                                            </WhiteboardProvider>
+                                        </AIAgentProvider>
+                                    </StandupBotProvider>
+                                </ChatProvider>
+                            </NotificationProvider>
+                        </TaskProvider>
+                    </ProjectProvider>
+                </RBACProvider>
             </AuthProvider>
         </ThemeProvider>
     );

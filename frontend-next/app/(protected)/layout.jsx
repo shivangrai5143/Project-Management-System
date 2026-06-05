@@ -1,19 +1,21 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { usePathname } from 'next/navigation';
+import { useRBAC } from '@/context/RBACContext';
 import Sidebar from '@/components/layout/Sidebar';
 import Header from '@/components/layout/Header';
 import { useNotifications } from '@/context/NotificationContext';
 import ToastContainer from '@/components/ui/Toast';
 import StandupPrompt from '@/components/standup/StandupPrompt';
 import AIAgentPanel from '@/components/ai/AIAgentPanel';
+import AccessDenied from '@/app/(protected)/access-denied/page';
 
 export default function ProtectedLayout({ children }) {
     const { isAuthenticated, isLoading } = useAuth();
-    const router = useRouter();
+    const { canAccess }                  = useRBAC();
+    const router   = useRouter();
     const pathname = usePathname();
     const { toasts, removeToast } = useNotifications();
 
@@ -23,6 +25,7 @@ export default function ProtectedLayout({ children }) {
         }
     }, [isAuthenticated, isLoading, router]);
 
+    // ---- Loading spinner ----
     if (isLoading) {
         return (
             <div className="min-h-screen bg-slate-950 flex items-center justify-center">
@@ -43,24 +46,31 @@ export default function ProtectedLayout({ children }) {
         return null;
     }
 
-    // Page title based on pathname
+    // ---- Page title based on pathname ----
     const getPageTitle = () => {
-        if (pathname === '/dashboard') return 'Dashboard';
-        if (pathname === '/projects') return 'Projects';
-        if (pathname?.startsWith('/projects/')) return 'Project Details';
-        if (pathname === '/tasks') return 'My Tasks';
-        if (pathname === '/team') return 'Team';
-        if (pathname === '/settings') return 'Settings';
-        if (pathname === '/analytics') return 'Analytics';
-        if (pathname === '/sprints') return 'Sprint Manager';
-        if (pathname === '/bugs') return 'Bug Tracker';
-        if (pathname === '/automation') return 'Automation';
-        if (pathname === '/knowledge') return 'Knowledge Base';
-        if (pathname === '/integrations') return 'Integrations';
-        if (pathname === '/gamification') return 'Achievements';
-        if (pathname === '/audit') return 'Audit Logs';
+        if (pathname === '/dashboard')              return 'Dashboard';
+        if (pathname === '/projects')               return 'Projects';
+        if (pathname?.startsWith('/projects/'))     return 'Project Details';
+        if (pathname === '/tasks')                  return 'My Tasks';
+        if (pathname === '/team')                   return 'Team';
+        if (pathname === '/settings')               return 'Settings';
+        if (pathname === '/analytics')              return 'Analytics';
+        if (pathname === '/sprints')                return 'Sprint Manager';
+        if (pathname === '/bugs')                   return 'Bug Tracker';
+        if (pathname === '/automation')             return 'Automation';
+        if (pathname === '/knowledge')              return 'Knowledge Base';
+        if (pathname === '/integrations')           return 'Integrations';
+        if (pathname === '/gamification')           return 'Achievements';
+        if (pathname === '/audit')                  return 'Audit Logs';
+        if (pathname === '/admin')                  return 'Admin Panel';
+        if (pathname === '/access-denied')          return 'Access Denied';
         return '';
     };
+
+    // ---- RBAC route guard ----
+    // canAccess() checks the route against the user's permissions.
+    // The access-denied page itself is always accessible.
+    const isAccessible = pathname === '/access-denied' || canAccess(pathname);
 
     return (
         <div className="min-h-screen bg-slate-950">
@@ -69,7 +79,7 @@ export default function ProtectedLayout({ children }) {
             <div className="lg:pl-64 min-h-screen transition-all duration-300">
                 <Header title={getPageTitle()} />
                 <main className="p-4 md:p-6 lg:p-8">
-                    {children}
+                    {isAccessible ? children : <AccessDenied />}
                 </main>
             </div>
 

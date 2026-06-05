@@ -1,63 +1,160 @@
 rules_version = '2';
 
+/**
+ * Firestore Security Rules — YojnaFlow RBAC
+ *
+ * These rules act as a second enforcement layer.
+ * Primary RBAC enforcement happens in the Express backend via requirePermission().
+ *
+ * Role hierarchy (stored in users/{uid}.role):
+ *   admin > project_manager > developer > client
+ *
+ * Helper functions check the requesting user's role from their Firestore document.
+ */
+
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper: check if user is authenticated
+    // -------------------------------------------------------------------------
+    // Helpers
+    // -------------------------------------------------------------------------
+
+    /** Returns true if the request is from an authenticated user. */
     function isAuth() {
       return request.auth != null;
     }
 
+    /** Get the requesting user's Firestore document. */
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    /** Returns the requesting user's role, defaulting to 'developer'. */
+    function userRole() {
+      let userData = getUserData();
+      return userData != null && userData.keys().hasAll(['role']) ? userData.role : 'developer';
+    }
+
+    /** True if the user is an admin. */
+    function isAdmin() {
+      return isAuth() && userRole() == 'admin';
+    }
+
+    /** True if the user is an admin or project manager. */
+    function isAdminOrPM() {
+      return isAuth() && (userRole() == 'admin' || userRole() == 'project_manager');
+    }
+
+    /** True if the user is NOT a client (i.e. admin/PM/developer). */
+    function isNotClient() {
+      return isAuth() && userRole() != 'client';
+    }
+
+    // -------------------------------------------------------------------------
     // Users collection
+    // -------------------------------------------------------------------------
     match /users/{userId} {
+      // Any authenticated user can read user profiles
       allow read: if isAuth();
-      allow write: if isAuth() && request.auth.uid == userId;
+
+      // Users can only write their own document;
+      // role changes require admin (enforced in backend; this blocks direct Firestore writes)
+      allow create: if isAuth() && request.auth.uid == userId;
+      allow update: if isAuth() && (
+        // Own profile update (cannot change role via client SDK)
+        (request.auth.uid == userId && !request.resource.data.keys().hasAll(['role']))
+        ||
+        // Admin can update any user including role changes
+        isAdmin()
+      );
+      allow delete: if isAdmin();
     }
 
+    // -------------------------------------------------------------------------
     // Projects collection
+    // -------------------------------------------------------------------------
     match /projects/{projectId} {
+      // Everyone authenticated can read projects
       allow read: if isAuth();
-      allow create: if isAuth();
-      allow update, delete: if isAuth();
+
+      // Create: admin or PM only
+      allow create: if isAdminOrPM();
+
+      // Update: admin or PM only
+      allow update: if isAdminOrPM();
+
+      // Delete: admin only
+      allow delete: if isAdmin();
     }
 
+    // -------------------------------------------------------------------------
     // Tasks collection
+    // -------------------------------------------------------------------------
     match /tasks/{taskId} {
+      // Clients can read tasks
       allow read: if isAuth();
-      allow create: if isAuth();
-      allow update, delete: if isAuth();
+
+      // Developers, PMs, admins can create/update tasks; clients cannot
+      allow create: if isNotClient();
+      allow update: if isNotClient();
+
+      // Delete: admin or PM only
+      allow delete: if isAdminOrPM();
     }
 
+    // -------------------------------------------------------------------------
     // Chat messages collection
+    // -------------------------------------------------------------------------
     match /chatMessages/{messageId} {
-      allow read: if isAuth();
-      allow create: if isAuth();
-      allow delete: if isAuth();
+      allow read:   if isAuth();
+      allow create: if isNotClient();
+      allow delete: if isAuth() && (
+        resource.data.userId == request.auth.uid || isAdmin()
+      );
     }
 
+    // -------------------------------------------------------------------------
     // Notifications collection
+    // -------------------------------------------------------------------------
     match /notifications/{notificationId} {
-      allow read: if isAuth();
+      allow read:   if isAuth();
       allow create: if isAuth();
-      allow update, delete: if isAuth();
+      allow update: if isAuth() && resource.data.userId == request.auth.uid;
+      allow delete: if isAuth() && (
+        resource.data.userId == request.auth.uid || isAdmin()
+      );
     }
 
+    // -------------------------------------------------------------------------
     // Standups collection
+    // -------------------------------------------------------------------------
     match /standups/{standupId} {
-      allow read: if isAuth();
-      allow create: if isAuth();
+      // Clients cannot read/write standups
+      allow read:   if isNotClient();
+      allow create: if isNotClient();
     }
 
+    // -------------------------------------------------------------------------
     // Standup settings collection
+    // -------------------------------------------------------------------------
     match /standupSettings/{userId} {
-      allow read: if isAuth() && request.auth.uid == userId;
+      allow read:  if isAuth() && request.auth.uid == userId;
       allow write: if isAuth() && request.auth.uid == userId;
     }
 
+    // -------------------------------------------------------------------------
     // Whiteboards collection
+    // -------------------------------------------------------------------------
     match /whiteboards/{projectId} {
+      // All authenticated users can read whiteboards
       allow read: if isAuth();
-      allow write: if isAuth();
+
+      // Write (create/update): developers and above; clients cannot
+      allow create: if isNotClient();
+      allow update: if isNotClient();
+
+      // Delete: admin or PM only
+      allow delete: if isAdminOrPM();
     }
   }
 }

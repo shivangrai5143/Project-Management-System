@@ -183,6 +183,10 @@ export const tasksApi = {
 // ============ USERS API ============
 
 export const usersApi = {
+    /**
+     * Update a user's avatar or other profile fields.
+     * PATCH /api/users/:userId
+     */
     async updateAvatar(userId, avatar) {
         return apiRequest(`/users/${userId}`, {
             method: 'PATCH',
@@ -190,10 +194,29 @@ export const usersApi = {
         });
     },
 
+    /**
+     * Fetch all users. Requires users.read permission.
+     * GET /api/users
+     */
     async getAll() {
         return apiRequest('/users');
     },
+
+    /**
+     * Change a user's system role. Requires users.manage permission (admin only).
+     * PATCH /api/users/:userId/role
+     *
+     * @param {string} userId
+     * @param {string} role   - One of 'admin' | 'project_manager' | 'developer' | 'client'
+     */
+    async updateRole(userId, role) {
+        return apiRequest(`/users/${userId}/role`, {
+            method: 'PATCH',
+            body: { role },
+        });
+    },
 };
+
 
 export { ApiError };
 export default apiRequest;
