@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import {
     FolderKanban,
@@ -19,6 +20,7 @@ import Avatar from '@/components/ui/Avatar';
 import Badge from '@/components/ui/Badge';
 import AIInsightsCard from '@/components/ai/AIInsightsCard';
 import StandupWidget from '@/components/dashboard/StandupWidget';
+import { ChartErrorBoundary } from '@/components/ui/ErrorBoundary';
 import { getRelativeTime, isOverdue, isDueSoon, formatDate } from '@/utils/helpers';
 import { demoActivities } from '@/data/mockData';
 import { STATUS_CONFIG, PRIORITY_CONFIG } from '@/utils/constants';
@@ -36,6 +38,10 @@ const DashboardPage = () => {
     const { user } = useAuth();
     const { projects, getTeamMember } = useProjects();
     const { tasks, getTaskStats, getTasksByAssignee } = useTasks();
+
+    // Mount guard — prevents Recharts from receiving width(-1)/height(-1) during SSR
+    const [isMounted, setIsMounted] = useState(false);
+    useEffect(() => { setIsMounted(true); }, []);
 
     const stats = getTaskStats();
     const myTasks = user ? getTasksByAssignee(user.id) : [];
@@ -125,32 +131,40 @@ const DashboardPage = () => {
                         </div>
                     </div>
                     <div className="h-64">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart data={chartData}>
-                                <defs>
-                                    <linearGradient id="colorCompleted" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#667eea" stopOpacity={0.3} />
-                                        <stop offset="95%" stopColor="#667eea" stopOpacity={0} />
-                                    </linearGradient>
-                                    <linearGradient id="colorCreated" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
-                                        <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                                    </linearGradient>
-                                </defs>
-                                <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                                <XAxis dataKey="name" stroke="#64748b" />
-                                <YAxis stroke="#64748b" />
-                                <Tooltip
-                                    contentStyle={{
-                                        backgroundColor: '#1e293b',
-                                        border: '1px solid #334155',
-                                        borderRadius: '8px',
-                                    }}
-                                />
-                                <Area type="monotone" dataKey="completed" stroke="#667eea" fillOpacity={1} fill="url(#colorCompleted)" />
-                                <Area type="monotone" dataKey="created" stroke="#10b981" fillOpacity={1} fill="url(#colorCreated)" />
-                            </AreaChart>
-                        </ResponsiveContainer>
+                        <ChartErrorBoundary>
+                            {isMounted ? (
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <AreaChart data={chartData}>
+                                        <defs>
+                                            <linearGradient id="colorCompleted" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="5%" stopColor="#667eea" stopOpacity={0.3} />
+                                                <stop offset="95%" stopColor="#667eea" stopOpacity={0} />
+                                            </linearGradient>
+                                            <linearGradient id="colorCreated" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
+                                                <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                                            </linearGradient>
+                                        </defs>
+                                        <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                                        <XAxis dataKey="name" stroke="#64748b" />
+                                        <YAxis stroke="#64748b" />
+                                        <Tooltip
+                                            contentStyle={{
+                                                backgroundColor: '#1e293b',
+                                                border: '1px solid #334155',
+                                                borderRadius: '8px',
+                                            }}
+                                        />
+                                        <Area type="monotone" dataKey="completed" stroke="#667eea" fillOpacity={1} fill="url(#colorCompleted)" />
+                                        <Area type="monotone" dataKey="created" stroke="#10b981" fillOpacity={1} fill="url(#colorCreated)" />
+                                    </AreaChart>
+                                </ResponsiveContainer>
+                            ) : (
+                                <div className="h-full flex items-center justify-center">
+                                    <div className="animate-spin w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full" />
+                                </div>
+                            )}
+                        </ChartErrorBoundary>
                     </div>
                 </Card>
 
