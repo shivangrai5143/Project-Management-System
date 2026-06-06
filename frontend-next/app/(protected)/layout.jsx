@@ -11,6 +11,7 @@ import ToastContainer from '@/components/ui/Toast';
 import StandupPrompt from '@/components/standup/StandupPrompt';
 import AIAgentPanel from '@/components/ai/AIAgentPanel';
 import AccessDenied from '@/app/(protected)/access-denied/page';
+import ErrorBoundary from '@/components/ui/ErrorBoundary';
 
 export default function ProtectedLayout({ children }) {
     const { isAuthenticated, isLoading } = useAuth();
@@ -80,7 +81,9 @@ export default function ProtectedLayout({ children }) {
             <div className="lg:pl-64 min-h-screen transition-all duration-300">
                 <Header title={getPageTitle()} />
                 <main className="p-4 md:p-6 lg:p-8">
-                    {isAccessible ? children : <AccessDenied />}
+                    <ErrorBoundary>
+                        {isAccessible ? children : <AccessDenied />}
+                    </ErrorBoundary>
                 </main>
             </div>
 

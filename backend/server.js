@@ -8,24 +8,37 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // CORS configuration
+// Explicit whitelist — no wildcards, no startsWith (prevents origin-spoofing)
 const allowedOrigins = [
     'http://localhost:5173',
     'http://localhost:4173',
     'http://localhost:3000',
-    process.env.FRONTEND_URL,
+    'https://yojnaflow.vercel.app',          // Production Vercel frontend
+    process.env.FRONTEND_URL,                 // Override via env if needed
 ].filter(Boolean);
 
-app.use(cors({
+const corsOptions = {
     origin: function (origin, callback) {
-        // Allow requests with no origin (mobile apps, curl, etc.)
+        // Allow requests with no origin (server-to-server, curl, mobile apps)
         if (!origin) return callback(null, true);
-        if (allowedOrigins.some(allowed => origin.startsWith(allowed))) {
+        // Exact match only — prevents subdomain/prefix spoofing
+        if (allowedOrigins.includes(origin)) {
             return callback(null, true);
         }
-        callback(new Error('Not allowed by CORS'));
+        console.warn(`[CORS] Blocked origin: ${origin}`);
+        callback(new Error(`Origin "${origin}" is not allowed by CORS policy`));
     },
     credentials: true,
-}));
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    optionsSuccessStatus: 204, // Some browsers (IE11) choke on 200 for OPTIONS
+};
+
+// Apply CORS middleware — must be before route handlers
+app.use(cors(corsOptions));
+
+// Handle OPTIONS preflight for all routes globally
+app.options('*', cors(corsOptions));
 
 // Parse JSON bodies
 app.use(express.json({ limit: '10mb' }));
