@@ -7,6 +7,12 @@ const inter = Inter({
     weight: ['300', '400', '500', '600', '700', '800'],
     variable: '--font-inter',
     display: 'swap',
+    // Fallback stack — used when Google Fonts is unreachable at build time
+    // (e.g. local builds without internet). Vercel CDN serves the real font.
+    fallback: ['ui-sans-serif', 'system-ui', '-apple-system', 'sans-serif'],
+    // Prevents next/font from blocking the build if the font CDN is down
+    preload: false,
+    adjustFontFallback: false,
 });
 
 export const metadata = {
