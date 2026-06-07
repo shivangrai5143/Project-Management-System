@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import {
     signInWithEmailAndPassword,
     createUserWithEmailAndPassword,
@@ -64,7 +64,7 @@ export const AuthProvider = ({ children }) => {
         return () => unsubscribe();
     }, []);
 
-    const login = async (email, password) => {
+    const login = useCallback(async (email, password) => {
         setError(null);
         try {
             const userCredential = await signInWithEmailAndPassword(auth, email, password);
@@ -82,9 +82,9 @@ export const AuthProvider = ({ children }) => {
             setError(errorMessage);
             return { success: false, error: errorMessage };
         }
-    };
+    }, []);
 
-    const signup = async (name, email, password) => {
+    const signup = useCallback(async (name, email, password) => {
         setError(null);
         try {
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
@@ -119,9 +119,9 @@ export const AuthProvider = ({ children }) => {
             setError(errorMessage);
             return { success: false, error: errorMessage };
         }
-    };
+    }, []);
 
-    const logout = async () => {
+    const logout = useCallback(async () => {
         try {
             await firebaseSignOut(auth);
             setUser(null);
@@ -129,30 +129,40 @@ export const AuthProvider = ({ children }) => {
         } catch (err) {
             console.error('Logout error:', err);
         }
-    };
+    }, []);
 
-    const updateProfile = async (updates) => {
+    const updateProfile = useCallback(async (updates) => {
         if (!user) return;
         try {
             const userDocRef = doc(db, 'users', user.id);
             await setDoc(userDocRef, { ...updates, updatedAt: new Date().toISOString() }, { merge: true });
-            setUser({ ...user, ...updates });
+            setUser((prev) => ({ ...prev, ...updates }));
         } catch (err) {
             console.error('Update profile error:', err);
         }
-    };
+    }, [user]);
+
+    const value = useMemo(() => ({
+        user,
+        isLoading,
+        isAuthenticated: !!user,
+        error,
+        login,
+        signup,
+        logout,
+        updateProfile,
+    }), [
+        user,
+        isLoading,
+        error,
+        login,
+        signup,
+        logout,
+        updateProfile
+    ]);
 
     return (
-        <AuthContext.Provider value={{
-            user,
-            isLoading,
-            isAuthenticated: !!user,
-            error,
-            login,
-            signup,
-            logout,
-            updateProfile,
-        }}>
+        <AuthContext.Provider value={value}>
             {children}
         </AuthContext.Provider>
     );

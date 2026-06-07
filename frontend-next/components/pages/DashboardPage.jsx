@@ -2,6 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
+
+const HeroCanvas = dynamic(() => import('@/components/3d/HeroCanvas'), { ssr: false });
 import {
     FolderKanban,
     CheckSquare,
@@ -60,14 +63,15 @@ const DashboardPage = () => {
     ];
 
     return (
-        <div className="space-y-8 animate-fade-in">
-            {/* Welcome section */}
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                <div>
-                    <h1 className="text-2xl md:text-3xl font-bold text-white">
+        <div className="space-y-8 animate-fade-in relative">
+            {/* Welcome section with 3D Canvas */}
+            <div className="relative flex flex-col md:flex-row md:items-center md:justify-between gap-4 p-8 rounded-2xl overflow-hidden border border-slate-800/50 bg-gradient-to-r from-slate-900 to-slate-900/50 shadow-xl">
+                <HeroCanvas />
+                <div className="relative z-10 pointer-events-none">
+                    <h1 className="text-2xl md:text-3xl font-bold text-white drop-shadow-md">
                         Welcome back, {user?.name ? user.name.split(' ')[0] : 'User'} 👋
                     </h1>
-                    <p className="text-slate-400 mt-1">
+                    <p className="text-slate-300 mt-2 font-medium drop-shadow">
                         Here's what's happening with your projects today.
                     </p>
                 </div>
@@ -130,7 +134,7 @@ const DashboardPage = () => {
                             </div>
                         </div>
                     </div>
-                    <div className="h-64">
+                    <div className="h-64 min-h-[250px] w-full">
                         <ChartErrorBoundary>
                             {isMounted ? (
                                 <ResponsiveContainer width="100%" height="100%">

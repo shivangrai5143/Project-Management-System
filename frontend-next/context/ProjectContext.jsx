@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { projectsService, usersService } from '@/services/firestore';
 import { useAuth } from '@/context/AuthContext';
 
@@ -54,7 +54,7 @@ export const ProjectProvider = ({ children }) => {
         };
     }, [user?.id]);
 
-    const createProject = async (projectData) => {
+    const createProject = useCallback(async (projectData) => {
         try {
             const newProject = await projectsService.create({
                 ...projectData,
@@ -66,77 +66,100 @@ export const ProjectProvider = ({ children }) => {
             console.error('Failed to create project:', err);
             throw err;
         }
-    };
+    }, [user?.id]);
 
-    const updateProject = async (id, updates) => {
+    const updateProject = useCallback(async (id, updates) => {
         try {
             await projectsService.update(id, updates);
         } catch (err) {
             console.error('Failed to update project:', err);
         }
-    };
+    }, []);
 
-    const deleteProject = async (id) => {
+    const deleteProject = useCallback(async (id) => {
         try {
             await projectsService.delete(id);
         } catch (err) {
             console.error('Failed to delete project:', err);
         }
-    };
+    }, []);
 
-    const getProject = (id) => {
+    const getProject = useCallback((id) => {
         return projects.find(project => project.id === id);
-    };
+    }, [projects]);
 
-    const getProjectsByUser = (userId) => {
+    const getProjectsByUser = useCallback((userId) => {
         return projects.filter(project =>
             project.ownerId === userId || project.teamIds?.includes(userId)
         );
-    };
+    }, [projects]);
 
-    const addTeamMember = async (projectId, userId) => {
+    const addTeamMember = useCallback(async (projectId, userId) => {
         const project = projects.find(p => p.id === projectId);
         if (project && !project.teamIds?.includes(userId)) {
             const updatedTeamIds = [...(project.teamIds || []), userId];
-            await updateProject(projectId, { teamIds: updatedTeamIds });
+            try {
+                await projectsService.update(projectId, { teamIds: updatedTeamIds });
+            } catch (err) {
+                console.error('Failed to add team member', err);
+            }
         }
-    };
+    }, [projects]);
 
-    const removeTeamMember = async (projectId, userId) => {
+    const removeTeamMember = useCallback(async (projectId, userId) => {
         const project = projects.find(p => p.id === projectId);
         if (project) {
             const updatedTeamIds = (project.teamIds || []).filter(id => id !== userId);
-            await updateProject(projectId, { teamIds: updatedTeamIds });
+            try {
+                await projectsService.update(projectId, { teamIds: updatedTeamIds });
+            } catch (err) {
+                console.error('Failed to remove team member', err);
+            }
         }
-    };
+    }, [projects]);
 
-    const getTeamMember = (userId) => {
+    const getTeamMember = useCallback((userId) => {
         return team.find(member => member.id === userId);
-    };
+    }, [team]);
 
-    const updateTeamMember = async (userId, updates) => {
+    const updateTeamMember = useCallback(async (userId, updates) => {
         try {
             await usersService.update(userId, updates);
         } catch (err) {
             console.error('Failed to update team member:', err);
         }
-    };
+    }, []);
+
+    const value = useMemo(() => ({
+        projects,
+        team,
+        isLoading,
+        createProject,
+        updateProject,
+        deleteProject,
+        getProject,
+        getProjectsByUser,
+        addTeamMember,
+        removeTeamMember,
+        getTeamMember,
+        updateTeamMember,
+    }), [
+        projects,
+        team,
+        isLoading,
+        createProject,
+        updateProject,
+        deleteProject,
+        getProject,
+        getProjectsByUser,
+        addTeamMember,
+        removeTeamMember,
+        getTeamMember,
+        updateTeamMember,
+    ]);
 
     return (
-        <ProjectContext.Provider value={{
-            projects,
-            team,
-            isLoading,
-            createProject,
-            updateProject,
-            deleteProject,
-            getProject,
-            getProjectsByUser,
-            addTeamMember,
-            removeTeamMember,
-            getTeamMember,
-            updateTeamMember,
-        }}>
+        <ProjectContext.Provider value={value}>
             {children}
         </ProjectContext.Provider>
     );
