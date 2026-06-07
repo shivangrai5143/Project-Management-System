@@ -16,6 +16,7 @@ import { useTheme } from '@/context/ThemeContext';
 import { useNotifications } from '@/context/NotificationContext';
 import { Dropdown } from '@/components/ui/Dropdown';
 import Button from '@/components/ui/Button';
+import { CommandPalette } from '@/components/layout/CommandPalette';
 import { getRelativeTime } from '@/utils/helpers';
 
 const Header = ({ onMenuClick, title }) => {
@@ -62,6 +63,9 @@ const Header = ({ onMenuClick, title }) => {
                         />
                     </div>
                 </form>
+
+                {/* Global Search / Command Palette */}
+                <CommandPalette />
 
                 {/* Right section */}
                 <div className="flex items-center gap-2">

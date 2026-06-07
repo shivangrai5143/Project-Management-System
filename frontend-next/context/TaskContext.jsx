@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { tasksService } from '@/services/firestore';
 import { logActivity, ACTIVITY_TYPES } from '@/utils/activityTracker';
 import { useAuth } from '@/context/AuthContext';
@@ -38,7 +38,7 @@ export const TaskProvider = ({ children }) => {
         return () => unsub();
     }, [user?.id]);
 
-    const createTask = async (taskData, userId, userName) => {
+    const createTask = useCallback(async (taskData, userId, userName) => {
         try {
             const newTask = await tasksService.create({
                 ...taskData,
@@ -60,43 +60,43 @@ export const TaskProvider = ({ children }) => {
             console.error('Failed to create task:', err);
             throw err;
         }
-    };
+    }, [tasks, user?.id]);
 
-    const updateTask = async (id, updates) => {
+    const updateTask = useCallback(async (id, updates) => {
         try {
             await tasksService.update(id, updates);
         } catch (err) {
             console.error('Failed to update task:', err);
         }
-    };
+    }, []);
 
-    const deleteTask = async (id) => {
+    const deleteTask = useCallback(async (id) => {
         try {
             await tasksService.delete(id);
         } catch (err) {
             console.error('Failed to delete task:', err);
         }
-    };
+    }, []);
 
-    const getTask = (id) => {
+    const getTask = useCallback((id) => {
         return tasks.find(task => task.id === id);
-    };
+    }, [tasks]);
 
-    const getTasksByProject = (projectId) => {
+    const getTasksByProject = useCallback((projectId) => {
         return tasks.filter(task => task.projectId === projectId);
-    };
+    }, [tasks]);
 
-    const getTasksByStatus = (projectId, status) => {
+    const getTasksByStatus = useCallback((projectId, status) => {
         return tasks
             .filter(task => task.projectId === projectId && task.status === status)
             .sort((a, b) => a.order - b.order);
-    };
+    }, [tasks]);
 
-    const getTasksByAssignee = (assigneeId) => {
+    const getTasksByAssignee = useCallback((assigneeId) => {
         return tasks.filter(task => task.assigneeId === assigneeId);
-    };
+    }, [tasks]);
 
-    const moveTask = async (taskId, newStatus, newOrder, userId, userName) => {
+    const moveTask = useCallback(async (taskId, newStatus, newOrder, userId, userName) => {
         const movedTask = tasks.find(t => t.id === taskId);
         const oldStatus = movedTask?.status;
 
@@ -127,9 +127,9 @@ export const TaskProvider = ({ children }) => {
                 });
             }
         }
-    };
+    }, [tasks]);
 
-    const reorderTasks = async (projectId, status, orderedIds) => {
+    const reorderTasks = useCallback(async (projectId, status, orderedIds) => {
         // Update order for each task in the list
         const updates = orderedIds.map((taskId, index) =>
             tasksService.update(taskId, { order: index })
@@ -139,9 +139,9 @@ export const TaskProvider = ({ children }) => {
         } catch (err) {
             console.error('Failed to reorder tasks:', err);
         }
-    };
+    }, []);
 
-    const getTaskStats = (projectId) => {
+    const getTaskStats = useCallback((projectId) => {
         const projectTasks = projectId
             ? tasks.filter(t => t.projectId === projectId)
             : tasks;
@@ -157,23 +157,38 @@ export const TaskProvider = ({ children }) => {
                 return new Date(t.dueDate) < new Date();
             }).length,
         };
-    };
+    }, [tasks]);
+
+    const value = useMemo(() => ({
+        tasks,
+        isLoading,
+        createTask,
+        updateTask,
+        deleteTask,
+        getTask,
+        getTasksByProject,
+        getTasksByStatus,
+        getTasksByAssignee,
+        moveTask,
+        reorderTasks,
+        getTaskStats,
+    }), [
+        tasks,
+        isLoading,
+        createTask,
+        updateTask,
+        deleteTask,
+        getTask,
+        getTasksByProject,
+        getTasksByStatus,
+        getTasksByAssignee,
+        moveTask,
+        reorderTasks,
+        getTaskStats
+    ]);
 
     return (
-        <TaskContext.Provider value={{
-            tasks,
-            isLoading,
-            createTask,
-            updateTask,
-            deleteTask,
-            getTask,
-            getTasksByProject,
-            getTasksByStatus,
-            getTasksByAssignee,
-            moveTask,
-            reorderTasks,
-            getTaskStats,
-        }}>
+        <TaskContext.Provider value={value}>
             {children}
         </TaskContext.Provider>
     );
