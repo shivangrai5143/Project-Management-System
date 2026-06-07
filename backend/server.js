@@ -21,8 +21,8 @@ const corsOptions = {
     origin: function (origin, callback) {
         // Allow requests with no origin (server-to-server, curl, mobile apps)
         if (!origin) return callback(null, true);
-        // Exact match only — prevents subdomain/prefix spoofing
-        if (allowedOrigins.includes(origin)) {
+        // Exact match only or vercel subdomains — prevents arbitrary origin spoofing
+        if (allowedOrigins.includes(origin) || origin.endsWith('.vercel.app')) {
             return callback(null, true);
         }
         console.warn(`[CORS] Blocked origin: ${origin}`);
