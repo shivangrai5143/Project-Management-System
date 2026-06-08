@@ -15,13 +15,24 @@ const allowedOrigins = [
     process.env.FRONTEND_URL,
 ].filter(Boolean);
 
+// Regex for allowing any *.vercel.app domain dynamically
+const vercelRegex = /^https:\/\/.*\.vercel\.app$/;
+
 app.use(cors({
     origin: function (origin, callback) {
         // Allow requests with no origin (mobile apps, curl, etc.)
         if (!origin) return callback(null, true);
+        
+        // Check static allowed origins
         if (allowedOrigins.some(allowed => origin.startsWith(allowed))) {
             return callback(null, true);
         }
+        
+        // Check dynamic Vercel domains
+        if (vercelRegex.test(origin)) {
+            return callback(null, true);
+        }
+
         callback(new Error('Not allowed by CORS'));
     },
     credentials: true,
