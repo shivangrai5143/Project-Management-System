@@ -134,41 +134,39 @@ const DashboardPage = () => {
                             </div>
                         </div>
                     </div>
-                    <div className="h-64 min-h-[250px] w-full">
-                        <ChartErrorBoundary>
-                            {isMounted ? (
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <AreaChart data={chartData}>
-                                        <defs>
-                                            <linearGradient id="colorCompleted" x1="0" y1="0" x2="0" y2="1">
-                                                <stop offset="5%" stopColor="#667eea" stopOpacity={0.3} />
-                                                <stop offset="95%" stopColor="#667eea" stopOpacity={0} />
-                                            </linearGradient>
-                                            <linearGradient id="colorCreated" x1="0" y1="0" x2="0" y2="1">
-                                                <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
-                                                <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                                            </linearGradient>
-                                        </defs>
-                                        <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                                        <XAxis dataKey="name" stroke="#64748b" />
-                                        <YAxis stroke="#64748b" />
-                                        <Tooltip
-                                            contentStyle={{
-                                                backgroundColor: '#1e293b',
-                                                border: '1px solid #334155',
-                                                borderRadius: '8px',
-                                            }}
-                                        />
-                                        <Area type="monotone" dataKey="completed" stroke="#667eea" fillOpacity={1} fill="url(#colorCompleted)" />
-                                        <Area type="monotone" dataKey="created" stroke="#10b981" fillOpacity={1} fill="url(#colorCreated)" />
-                                    </AreaChart>
-                                </ResponsiveContainer>
-                            ) : (
-                                <div className="h-full flex items-center justify-center">
-                                    <div className="animate-spin w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full" />
-                                </div>
-                            )}
-                        </ChartErrorBoundary>
+                    <div className="h-[250px] min-h-[250px] w-full relative">
+                        {isMounted ? (
+                            <ResponsiveContainer width="100%" height="100%">
+                                <AreaChart data={chartData}>
+                                    <defs>
+                                        <linearGradient id="colorCompleted" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="5%" stopColor="#667eea" stopOpacity={0.3} />
+                                            <stop offset="95%" stopColor="#667eea" stopOpacity={0} />
+                                        </linearGradient>
+                                        <linearGradient id="colorCreated" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
+                                            <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                                        </linearGradient>
+                                    </defs>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                                    <XAxis dataKey="name" stroke="#64748b" />
+                                    <YAxis stroke="#64748b" />
+                                    <Tooltip
+                                        contentStyle={{
+                                            backgroundColor: '#1e293b',
+                                            border: '1px solid #334155',
+                                            borderRadius: '8px',
+                                        }}
+                                    />
+                                    <Area type="monotone" dataKey="completed" stroke="#667eea" fillOpacity={1} fill="url(#colorCompleted)" />
+                                    <Area type="monotone" dataKey="created" stroke="#10b981" fillOpacity={1} fill="url(#colorCreated)" />
+                                </AreaChart>
+                            </ResponsiveContainer>
+                        ) : (
+                            <div className="w-full h-full flex items-center justify-center text-slate-500">
+                                Loading chart...
+                            </div>
+                        )}
                     </div>
                 </Card>
 

@@ -17,16 +17,25 @@ const allowedOrigins = [
     process.env.FRONTEND_URL,                 // Override via env if needed
 ].filter(Boolean);
 
-const corsOptions = {
+// Regex for allowing any *.vercel.app domain dynamically
+const vercelRegex = /^https:\/\/.*\.vercel\.app$/;
+
+app.use(cors({
     origin: function (origin, callback) {
         // Allow requests with no origin (server-to-server, curl, mobile apps)
         if (!origin) return callback(null, true);
-        // Exact match only or vercel subdomains — prevents arbitrary origin spoofing
-        if (allowedOrigins.includes(origin) || origin.endsWith('.vercel.app')) {
+        
+        // Check static allowed origins
+        if (allowedOrigins.some(allowed => origin.startsWith(allowed))) {
             return callback(null, true);
         }
-        console.warn(`[CORS] Blocked origin: ${origin}`);
-        callback(new Error(`Origin "${origin}" is not allowed by CORS policy`));
+        
+        // Check dynamic Vercel domains
+        if (vercelRegex.test(origin)) {
+            return callback(null, true);
+        }
+
+        callback(new Error('Not allowed by CORS'));
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
