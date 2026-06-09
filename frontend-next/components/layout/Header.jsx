@@ -3,167 +3,248 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
-    Search,
     Bell,
-    Moon,
-    Sun,
-    Menu,
-    Plus,
-    Trash2,
     CheckCheck,
+    LogOut,
+    Menu,
+    Moon,
+    Settings,
+    Sun,
+    Trash2,
+    X,
 } from 'lucide-react';
 import { useTheme } from '@/context/ThemeContext';
 import { useNotifications } from '@/context/NotificationContext';
-import { Dropdown } from '@/components/ui/Dropdown';
+import { useAuth } from '@/context/AuthContext';
+import { useRBAC } from '@/context/RBACContext';
+import Avatar from '@/components/ui/Avatar';
 import Button from '@/components/ui/Button';
+import { Dropdown, DropdownDivider, DropdownItem } from '@/components/ui/Dropdown';
+import RoleBadge from '@/components/ui/RoleBadge';
 import { CommandPalette } from '@/components/layout/CommandPalette';
 import { getRelativeTime } from '@/utils/helpers';
 
 const Header = ({ onMenuClick, title }) => {
-    const [searchQuery, setSearchQuery] = useState('');
-    const [showAllNotifications, setShowAllNotifications] = useState(false);
+    const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
     const { isDark, toggleTheme } = useTheme();
-    const { notifications, markAsRead, markAllAsRead, deleteNotification, getUnreadCount } = useNotifications();
+    const { user, logout } = useAuth();
+    const { userRole } = useRBAC();
+    const {
+        notifications,
+        markAsRead,
+        markAllAsRead,
+        deleteNotification,
+        getUnreadCount,
+    } = useNotifications();
     const router = useRouter();
     const unreadCount = getUnreadCount();
 
-    const handleSearch = (e) => {
-        e.preventDefault();
-        if (searchQuery.trim()) {
-            router.push(`/search?q=${encodeURIComponent(searchQuery)}`);
-        }
-    };
-
     return (
         <>
-            <header className="h-16 bg-slate-900/80 backdrop-blur-lg border-b border-slate-800 flex items-center justify-between px-4 md:px-6 sticky top-0 z-30">
-                {/* Left section */}
-                <div className="flex items-center gap-4">
-                    <button
-                        onClick={onMenuClick}
-                        className="lg:hidden p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
-                    >
-                        <Menu className="w-5 h-5" />
-                    </button>
-                    {title && (
-                        <h1 className="text-xl font-semibold text-white hidden md:block">{title}</h1>
-                    )}
-                </div>
+            <header className="sticky top-0 z-30 border-b border-slate-800 bg-slate-900/80 backdrop-blur-xl">
+                <div className="mx-auto flex h-16 w-full max-w-[1440px] items-center gap-4 px-4 sm:px-6 lg:px-6">
+                    <div className="flex shrink-0 items-center gap-3">
+                        <button
+                            type="button"
+                            onClick={onMenuClick}
+                            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-800 bg-slate-800/60 text-slate-300 transition-colors hover:border-slate-700 hover:text-white lg:hidden"
+                            aria-label="Open sidebar"
+                        >
+                            <Menu className="h-5 w-5" />
+                        </button>
 
-                {/* Center - Search */}
-                <form onSubmit={handleSearch} className="flex-1 max-w-xl mx-4 hidden md:block">
-                    <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                        <input
-                            type="text"
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            placeholder="Search projects, tasks..."
-                            className="w-full pl-10 pr-4 py-2 rounded-xl bg-slate-800/50 border border-slate-700 text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                        <div className="hidden sm:block">
+                            <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Workspace</p>
+                            <h1 className="text-sm font-semibold text-white">{title}</h1>
+                        </div>
+                    </div>
+
+                    <div className="hidden min-w-0 flex-1 md:block">
+                        <CommandPalette
+                            className="max-w-xl"
+                            placeholder="Search projects, tasks, teammates..."
                         />
                     </div>
-                </form>
 
-                {/* Global Search / Command Palette */}
-                <CommandPalette />
+                    <div className="ml-auto flex items-center gap-2">
+                        <CommandPalette compact className="md:hidden" />
 
-                {/* Right section */}
-                <div className="flex items-center gap-2">
-                    <Button
-                        variant="primary"
-                        size="sm"
-                        icon={Plus}
-                        className="hidden sm:flex"
-                        onClick={() => router.push('/projects')}
-                    >
-                        New Project
-                    </Button>
-
-                    {/* Theme toggle */}
-                    <div className="relative group">
                         <button
+                            type="button"
                             onClick={toggleTheme}
-                            className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
-                            title={`${isDark ? 'Light' : 'Dark'} mode (Ctrl+D)`}
+                            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-800 bg-slate-800/60 text-slate-300 transition-colors hover:border-slate-700 hover:text-white"
+                            title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+                            aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
                         >
-                            {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+                            {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
                         </button>
-                    </div>
 
-                    {/* Notifications */}
-                    <div className="relative">
                         <button
-                            onClick={() => setShowAllNotifications(true)}
-                            className="relative p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                            type="button"
+                            onClick={() => setIsNotificationsOpen(true)}
+                            className="relative inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-800 bg-slate-800/60 text-slate-300 transition-colors hover:border-slate-700 hover:text-white"
+                            aria-label="Open notifications"
                         >
-                            <Bell className="w-5 h-5" />
+                            <Bell className="h-4 w-4" />
                             {unreadCount > 0 && (
-                                <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 rounded-full text-xs text-white flex items-center justify-center">
+                                <span className="absolute -right-1 -top-1 inline-flex min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-semibold text-white">
                                     {unreadCount > 9 ? '9+' : unreadCount}
                                 </span>
                             )}
                         </button>
+
+                        <Dropdown
+                            align="right"
+                            trigger={(
+                                <button
+                                    type="button"
+                                    className="inline-flex items-center gap-3 rounded-xl border border-slate-800 bg-slate-800/60 px-2 py-2 text-left transition-colors hover:border-slate-700"
+                                >
+                                    <Avatar
+                                        name={user?.name}
+                                        src={user?.avatar}
+                                        size="sm"
+                                        className="ring-2 ring-slate-700"
+                                    />
+                                    <div className="hidden min-w-0 lg:block">
+                                        <p className="truncate text-sm font-medium text-white">
+                                            {user?.name || 'User'}
+                                        </p>
+                                        <p className="truncate text-xs text-slate-400">
+                                            Account
+                                        </p>
+                                    </div>
+                                </button>
+                            )}
+                        >
+                            {(close) => (
+                                <>
+                                    <div className="border-b border-slate-800 px-4 py-3">
+                                        <p className="text-sm font-semibold text-white">{user?.name}</p>
+                                        <p className="text-xs text-slate-400">{user?.email}</p>
+                                        <div className="mt-3">
+                                            <RoleBadge role={userRole} size="sm" />
+                                        </div>
+                                    </div>
+                                    <DropdownItem
+                                        icon={Settings}
+                                        onClick={() => {
+                                            close();
+                                            router.push('/settings');
+                                        }}
+                                    >
+                                        Settings
+                                    </DropdownItem>
+                                    <DropdownItem
+                                        icon={isDark ? Sun : Moon}
+                                        onClick={() => {
+                                            close();
+                                            toggleTheme();
+                                        }}
+                                    >
+                                        {isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+                                    </DropdownItem>
+                                    <DropdownDivider />
+                                    <DropdownItem
+                                        icon={LogOut}
+                                        danger
+                                        onClick={() => {
+                                            close();
+                                            logout();
+                                        }}
+                                    >
+                                        Log out
+                                    </DropdownItem>
+                                </>
+                            )}
+                        </Dropdown>
                     </div>
                 </div>
             </header>
 
-            {/* All Notifications Panel */}
-            {showAllNotifications && (
+            {isNotificationsOpen && (
                 <>
                     <div
-                        className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100]"
-                        onClick={() => setShowAllNotifications(false)}
+                        className="fixed inset-0 z-40 bg-slate-950/60 backdrop-blur-sm"
+                        onClick={() => setIsNotificationsOpen(false)}
                     />
-                    <div className="fixed top-0 right-0 h-screen w-full max-w-md bg-slate-900 border-l border-slate-700 shadow-2xl z-[101] animate-slide-in-right">
-                        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-700">
-                            <h2 className="text-xl font-semibold text-white">All Notifications</h2>
+                    <div className="fixed bottom-0 right-0 top-16 z-50 flex w-full max-w-md flex-col border-l border-slate-800 bg-slate-900 shadow-2xl">
+                        <div className="flex items-center justify-between border-b border-slate-800 px-4 py-4 sm:px-6">
+                            <div>
+                                <h2 className="text-lg font-semibold text-white">Notifications</h2>
+                                <p className="text-sm text-slate-400">
+                                    {unreadCount} unread
+                                </p>
+                            </div>
                             <button
-                                onClick={() => setShowAllNotifications(false)}
-                                className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
-                            >✕</button>
+                                type="button"
+                                onClick={() => setIsNotificationsOpen(false)}
+                                className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-800 bg-slate-800/50 text-slate-300 transition-colors hover:border-slate-700 hover:text-white"
+                                aria-label="Close notifications"
+                            >
+                                <X className="h-4 w-4" />
+                            </button>
                         </div>
+
                         {notifications.length > 0 && (
-                            <div className="flex items-center justify-between px-6 py-3 border-b border-slate-800">
+                            <div className="flex items-center justify-between border-b border-slate-800 px-4 py-3 sm:px-6">
                                 <span className="text-sm text-slate-400">
-                                    {unreadCount} unread notification{unreadCount !== 1 ? 's' : ''}
+                                    Keep your inbox clear and review recent updates.
                                 </span>
                                 <Button variant="ghost" size="sm" icon={CheckCheck} onClick={markAllAsRead}>
-                                    Mark all as read
+                                    Mark all read
                                 </Button>
                             </div>
                         )}
-                        <div className="overflow-y-auto p-4" style={{ height: 'calc(100vh - 130px)' }}>
+
+                        <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
                             {notifications.length === 0 ? (
-                                <div className="py-16 text-center">
-                                    <Bell className="w-16 h-16 text-slate-700 mx-auto mb-4" />
-                                    <p className="text-slate-400 text-lg">No notifications yet</p>
+                                <div className="flex h-full flex-col items-center justify-center rounded-2xl border border-dashed border-slate-800 bg-slate-800/30 p-6 text-center">
+                                    <Bell className="mb-4 h-10 w-10 text-slate-600" />
+                                    <p className="text-sm font-medium text-slate-300">No notifications yet</p>
+                                    <p className="mt-2 text-sm text-slate-500">
+                                        Activity updates, mentions, and reminders will appear here.
+                                    </p>
                                 </div>
                             ) : (
                                 <div className="space-y-3">
-                                    {notifications.map(notif => (
+                                    {notifications.map((notification) => (
                                         <div
-                                            key={notif.id}
-                                            className={`p-4 rounded-xl border transition-all ${!notif.read
-                                                ? 'bg-indigo-500/10 border-indigo-500/30'
-                                                : 'bg-slate-800/50 border-slate-700/50 hover:bg-slate-700/50'
-                                                }`}
+                                            key={notification.id}
+                                            className={`rounded-2xl border p-4 transition-colors ${
+                                                notification.read
+                                                    ? 'border-slate-800 bg-slate-800/40'
+                                                    : 'border-indigo-500/20 bg-indigo-500/10'
+                                            }`}
                                         >
-                                            <div className="flex items-start justify-between gap-4">
-                                                <div className="flex-1 cursor-pointer" onClick={() => markAsRead(notif.id)}>
-                                                    <div className="flex items-center gap-2">
-                                                        {!notif.read && <span className="w-2 h-2 bg-indigo-500 rounded-full flex-shrink-0" />}
-                                                        <h4 className={`font-medium ${!notif.read ? 'text-white' : 'text-slate-300'}`}>
-                                                            {notif.title}
-                                                        </h4>
-                                                    </div>
-                                                    <p className="text-sm text-slate-400 mt-2">{notif.message}</p>
-                                                    <p className="text-xs text-slate-500 mt-2">{getRelativeTime(notif.createdAt)}</p>
-                                                </div>
+                                            <div className="flex items-start justify-between gap-3">
                                                 <button
-                                                    onClick={() => deleteNotification(notif.id)}
-                                                    className="p-2 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors flex-shrink-0"
+                                                    type="button"
+                                                    onClick={() => markAsRead(notification.id)}
+                                                    className="min-w-0 flex-1 text-left"
                                                 >
-                                                    <Trash2 className="w-4 h-4" />
+                                                    <div className="flex items-center gap-2">
+                                                        {!notification.read && (
+                                                            <span className="h-2 w-2 rounded-full bg-indigo-400" />
+                                                        )}
+                                                        <p className="text-sm font-medium text-white">
+                                                            {notification.title}
+                                                        </p>
+                                                    </div>
+                                                    <p className="mt-2 text-sm text-slate-400">
+                                                        {notification.message}
+                                                    </p>
+                                                    <p className="mt-3 text-xs text-slate-500">
+                                                        {getRelativeTime(notification.createdAt)}
+                                                    </p>
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => deleteNotification(notification.id)}
+                                                    className="inline-flex h-9 w-9 items-center justify-center rounded-xl text-slate-500 transition-colors hover:bg-red-500/10 hover:text-red-300"
+                                                    aria-label="Delete notification"
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
                                                 </button>
                                             </div>
                                         </div>

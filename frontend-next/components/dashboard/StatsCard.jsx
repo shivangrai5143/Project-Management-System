@@ -1,11 +1,30 @@
 'use client';
 
-import {
-    TrendingUp,
-    TrendingDown,
-} from 'lucide-react';
-import { motion } from 'framer-motion';
+import { TrendingDown, TrendingUp } from 'lucide-react';
 import Card from '@/components/ui/Card';
+
+const TONE_STYLES = {
+    slate: {
+        icon: 'bg-slate-800 text-slate-200 border-slate-700',
+        value: 'text-white',
+    },
+    indigo: {
+        icon: 'bg-indigo-500/10 text-indigo-300 border-indigo-500/20',
+        value: 'text-white',
+    },
+    emerald: {
+        icon: 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20',
+        value: 'text-white',
+    },
+    amber: {
+        icon: 'bg-amber-500/10 text-amber-300 border-amber-500/20',
+        value: 'text-white',
+    },
+    rose: {
+        icon: 'bg-red-500/10 text-red-300 border-red-500/20',
+        value: 'text-white',
+    },
+};
 
 const StatsCard = ({
     title,
@@ -13,55 +32,43 @@ const StatsCard = ({
     change,
     changeType = 'neutral',
     icon: Icon,
-    iconColor = '#667eea',
+    tone = 'indigo',
 }) => {
-    return (
-        <motion.div
-            whileHover={{ y: -5, scale: 1.02 }}
-            transition={{ type: "spring", stiffness: 300, damping: 20 }}
-            className="h-full"
-        >
-            <Card className="relative overflow-hidden group h-full bg-slate-900/40 backdrop-blur-xl border border-slate-700/50 hover:border-slate-600/80 shadow-lg hover:shadow-xl transition-colors">
-                <div className="flex items-start justify-between relative z-10">
-                    <div>
-                        <p className="text-sm font-medium text-slate-400 mb-1">{title}</p>
-                        <p className="text-3xl font-bold text-white tracking-tight">{value}</p>
+    const toneStyle = TONE_STYLES[tone] || TONE_STYLES.indigo;
 
-                        {change !== undefined && (
-                            <div className={`
-                                flex items-center gap-1 mt-3 text-sm font-medium px-2 py-1 rounded-md w-fit
-                                ${changeType === 'positive' ? 'text-emerald-400 bg-emerald-400/10' : ''}
-                                ${changeType === 'negative' ? 'text-red-400 bg-red-400/10' : ''}
-                                ${changeType === 'neutral' ? 'text-slate-400 bg-slate-800' : ''}
-                            `}>
-                                {changeType === 'positive' && <TrendingUp className="w-3.5 h-3.5" />}
-                                {changeType === 'negative' && <TrendingDown className="w-3.5 h-3.5" />}
-                                <span>{change}</span>
-                            </div>
-                        )}
+    const changeStyles = {
+        positive: 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20',
+        negative: 'bg-red-500/10 text-red-300 border-red-500/20',
+        neutral: 'bg-slate-800/80 text-slate-300 border-slate-700/80',
+    };
+
+    return (
+        <Card padding="dashboard" className="h-full">
+            <div className="flex h-full flex-col justify-between gap-6">
+                <div className="flex items-start justify-between gap-4">
+                    <div className="space-y-2">
+                        <p className="text-sm font-medium text-slate-400">{title}</p>
+                        <p className={`text-3xl font-semibold tracking-tight ${toneStyle.value}`}>
+                            {value}
+                        </p>
                     </div>
 
                     {Icon && (
-                        <div
-                            className="p-3 rounded-2xl transition-transform group-hover:rotate-12 duration-300"
-                            style={{ 
-                                backgroundColor: `${iconColor}15`,
-                                border: `1px solid ${iconColor}30`,
-                                boxShadow: `0 0 20px ${iconColor}20` 
-                            }}
-                        >
-                            <Icon className="w-6 h-6" style={{ color: iconColor }} />
+                        <div className={`flex h-11 w-11 items-center justify-center rounded-2xl border ${toneStyle.icon}`}>
+                            <Icon className="h-5 w-5" />
                         </div>
                     )}
                 </div>
 
-                {/* Decorative glow */}
-                <div
-                    className="absolute -bottom-6 -right-6 w-24 h-24 rounded-full blur-2xl opacity-20 group-hover:opacity-40 transition-opacity duration-500"
-                    style={{ background: iconColor }}
-                />
-            </Card>
-        </motion.div>
+                {change !== undefined && (
+                    <div className={`inline-flex w-fit items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium ${changeStyles[changeType]}`}>
+                        {changeType === 'positive' && <TrendingUp className="h-3.5 w-3.5" />}
+                        {changeType === 'negative' && <TrendingDown className="h-3.5 w-3.5" />}
+                        <span>{change}</span>
+                    </div>
+                )}
+            </div>
+        </Card>
     );
 };
 

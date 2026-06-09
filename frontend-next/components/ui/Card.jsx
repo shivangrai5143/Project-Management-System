@@ -9,26 +9,27 @@ const Card = ({
     ...props
 }) => {
     const variants = {
-        default: 'bg-slate-800/50 border border-slate-700/50',
-        glass: 'glass',
-        solid: 'bg-slate-800 border border-slate-700',
-        gradient: 'bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700/50',
+        default: 'bg-slate-900/80 border border-slate-800 shadow-lg shadow-slate-950/25',
+        glass: 'glass-dark shadow-lg shadow-slate-950/25',
+        solid: 'bg-slate-800 border border-slate-700 shadow-lg shadow-slate-950/20',
+        gradient: 'bg-gradient-to-br from-slate-900 to-slate-800 border border-slate-800 shadow-lg shadow-slate-950/25',
     };
 
     const paddings = {
         none: '',
         sm: 'p-3',
-        default: 'p-4 md:p-6',
+        default: 'p-4 sm:p-5',
+        dashboard: 'p-4',
         lg: 'p-6 md:p-8',
     };
 
     return (
         <div
             className={`
-        rounded-xl
+        rounded-2xl
         ${variants[variant]}
         ${paddings[padding]}
-        ${hover ? 'hover-lift cursor-pointer' : ''}
+        ${hover ? 'cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-700 hover:shadow-xl hover:shadow-slate-950/30' : ''}
         ${className}
       `}
             {...props}
