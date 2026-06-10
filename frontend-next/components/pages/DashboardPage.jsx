@@ -11,7 +11,9 @@ import {
     Clock3,
     FolderKanban,
     ListTodo,
+    Plus,
     Sparkles,
+    Timer,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useAIAgent } from '@/context/AIAgentContext';
@@ -56,23 +58,15 @@ const buildChartData = (tasks) => {
 };
 
 /* ─────────────────────────────────────────────────────────────
-   Shared quick-action link style
-───────────────────────────────────────────────────────────── */
-const quickActionClasses =
-    'flex items-center justify-between rounded-xl border border-slate-800 bg-slate-800/40 px-4 py-3 text-left transition-colors hover:border-slate-700 hover:bg-slate-800/70';
-
-/* ─────────────────────────────────────────────────────────────
    Section heading — consistent eyebrow / title / description
    pattern across all dashboard sections.
 ───────────────────────────────────────────────────────────── */
 const SectionHeading = ({ eyebrow, title, description, action }) => (
     <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
-            {/* Eyebrow — 10px uppercase label (design system tier 1) */}
             <p className="text-[10px] font-medium uppercase tracking-widest text-slate-500">
                 {eyebrow}
             </p>
-            {/* Title — 18px semibold (design system tier 2) */}
             <h2 className="mt-1 text-lg font-semibold text-white">{title}</h2>
             {description && (
                 <p className="mt-0.5 text-sm text-slate-400">{description}</p>
@@ -118,7 +112,7 @@ const TaskListCard = ({
         ) : (
             <div className="mt-5 space-y-2">
                 {tasks.map((task) => (
-                    <div key={task.id} className="rounded-xl border border-slate-800 bg-slate-800/40 p-3.5">
+                    <div key={task.id} className="rounded-xl border border-slate-800 bg-slate-800/40 p-3.5 transition-colors hover:border-slate-700 hover:bg-slate-800/60">
                         <div className="flex flex-col gap-2.5 sm:flex-row sm:items-start sm:justify-between">
                             <div className="min-w-0">
                                 <p className="truncate text-sm font-medium text-white">{task.title}</p>
@@ -233,114 +227,124 @@ const DashboardPage = () => {
 
     return (
         /*
-         * Root: space-y-8 = 32px between sections (one step above card gap-6).
-         * This creates clear visual rhythm: sections feel distinct, cards feel grouped.
+         * Root: space-y-6 = 24px between sections.
+         * Tighter than the old space-y-8 — sections feel like one workspace
+         * rather than isolated pages (Linear / Notion aesthetic).
          */
-        <div className="space-y-8">
+        <div className="space-y-6">
 
             {/* ════════════════════════════════════════
-                § 1  WELCOME + QUICK ACTIONS
+                § 1  WELCOME HEADER
                 ════════════════════════════════════════
-                Two-column grid: greeting expands, quick actions pinned to 300px.
-                Collapses to single column below lg.
+                No Card wrapper — this is a page-header section, not a panel.
+                Left: greeting + subtitle. Right: workspace pulse stats.
+                Below: compact horizontal Quick Action bar (Linear-style).
             */}
-            <section
-                aria-label="Welcome"
-                className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_300px]"
-            >
-                {/* Greeting card */}
-                <Card padding="dashboard">
-                    <div className="flex h-full flex-col justify-between gap-6">
-                        <div>
-                            <p className="text-[10px] font-medium uppercase tracking-widest text-slate-500">
-                                Welcome back
-                            </p>
-                            {/* h1 — single page landmark, 28px/32px */}
-                            <h1 className="mt-2 text-2xl font-bold tracking-tight text-white sm:text-3xl">
-                                {firstName} 👋
-                            </h1>
-                            <p className="mt-3 max-w-lg text-sm leading-relaxed text-slate-400">
-                                You have{' '}
-                                <span className="font-medium text-white">{myOpenTasks} active tasks</span>{' '}
-                                assigned to you across{' '}
-                                <span className="font-medium text-white">{projects.length} projects</span>.
-                                Keep momentum on in-progress work and resolve overdue items first.
-                            </p>
-                        </div>
+            <section aria-label="Welcome" className="space-y-4">
 
-                        {/* Status badges */}
-                        <div className="flex flex-wrap gap-2">
-                            <Badge variant="primary" size="md">
-                                {projects.length} active projects
-                            </Badge>
-                            <Badge variant={stats.overdue > 0 ? 'danger' : 'success'} size="md">
-                                {stats.overdue > 0 ? `${stats.overdue} overdue` : 'No overdue tasks'}
-                            </Badge>
-                            <Badge variant="warning" size="md">
-                                {myOpenTasks} assigned to you
-                            </Badge>
-                        </div>
+                {/* Top row: greeting ↔ live stats */}
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                        {/* Eyebrow */}
+                        <p className="text-[10px] font-medium uppercase tracking-widest text-slate-500">
+                            Welcome back
+                        </p>
+                        {/* h1 — single landmark, clear Level 1 */}
+                        <h1 className="mt-1.5 text-2xl font-bold tracking-tight text-white">
+                            {firstName} 👋
+                        </h1>
+                        <p className="mt-1.5 text-sm text-slate-400">
+                            You have{' '}
+                            <span className="font-medium text-slate-200">{myOpenTasks} active tasks</span>{' '}
+                            across{' '}
+                            <span className="font-medium text-slate-200">{projects.length} projects</span>.
+                        </p>
                     </div>
-                </Card>
 
-                {/* Quick actions card */}
-                <Card padding="dashboard">
-                    <p className="text-xs font-medium uppercase tracking-wider text-slate-500">
-                        Quick actions
-                    </p>
-                    <div className="mt-4 flex flex-col gap-2.5">
-                        <Link href="/projects" className={quickActionClasses}>
-                            <div className="flex items-center gap-3">
-                                <div className="rounded-lg bg-indigo-500/10 p-2 text-indigo-300">
-                                    <FolderKanban className="h-4 w-4" />
-                                </div>
-                                <div>
-                                    <p className="text-sm font-medium text-white">Projects</p>
-                                    <p className="mt-0.5 text-xs text-slate-400">Roadmap & ownership</p>
-                                </div>
-                            </div>
-                            <ArrowRight className="h-3.5 w-3.5 shrink-0 text-slate-500" />
-                        </Link>
-
-                        <Link href="/tasks" className={quickActionClasses}>
-                            <div className="flex items-center gap-3">
-                                <div className="rounded-lg bg-emerald-500/10 p-2 text-emerald-300">
-                                    <ListTodo className="h-4 w-4" />
-                                </div>
-                                <div>
-                                    <p className="text-sm font-medium text-white">Tasks</p>
-                                    <p className="mt-0.5 text-xs text-slate-400">Triage & move blockers</p>
-                                </div>
-                            </div>
-                            <ArrowRight className="h-3.5 w-3.5 shrink-0 text-slate-500" />
-                        </Link>
-
-                        <button
-                            type="button"
-                            onClick={() => openPanel()}
-                            className={quickActionClasses}
-                        >
-                            <div className="flex items-center gap-3">
-                                <div className="rounded-lg bg-violet-500/10 p-2 text-violet-300">
-                                    <Bot className="h-4 w-4" />
-                                </div>
-                                <div className="text-left">
-                                    <p className="text-sm font-medium text-white">ERA Assistant</p>
-                                    <p className="mt-0.5 text-xs text-slate-400">Plans, summaries & steps</p>
-                                </div>
-                            </div>
-                            <ArrowRight className="h-3.5 w-3.5 shrink-0 text-slate-500" />
-                        </button>
+                    {/* Right: compact pill stats */}
+                    <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
+                        <Badge variant="primary" size="md">
+                            {projects.length} projects
+                        </Badge>
+                        <Badge variant={stats.overdue > 0 ? 'danger' : 'success'} size="md">
+                            {stats.overdue > 0 ? `${stats.overdue} overdue` : 'All on track'}
+                        </Badge>
+                        <Badge variant="warning" size="md">
+                            {myOpenTasks} assigned
+                        </Badge>
                     </div>
-                </Card>
+                </div>
+
+                {/* ── Horizontal Quick Action Bar ── */}
+                {/*
+                 * Horizontal action toolbar directly beneath the greeting.
+                 * This is the key UX change: replaces the 300px right-panel card.
+                 * Buttons are styled via globals.css utility classes for portability.
+                 * flex-wrap ensures graceful collapse on small screens.
+                 *
+                 * Actions:
+                 *   New Project  → navigate to /projects (primary CTA)
+                 *   Create Task  → navigate to /tasks
+                 *   Start Sprint → navigate to /sprints
+                 *   Ask AI       → open the AI panel
+                 */}
+                <div
+                    role="toolbar"
+                    aria-label="Quick actions"
+                    className="flex flex-wrap items-center gap-2 border-t border-slate-800/60 pt-4"
+                >
+                    {/* Primary: New Project */}
+                    <Link
+                        href="/projects"
+                        id="qa-new-project"
+                        className="dash-action-primary"
+                        aria-label="Go to Projects"
+                    >
+                        <FolderKanban className="h-3.5 w-3.5" aria-hidden="true" />
+                        New Project
+                    </Link>
+
+                    {/* Secondary: Create Task */}
+                    <Link
+                        href="/tasks"
+                        id="qa-create-task"
+                        className="dash-action-secondary"
+                        aria-label="Go to Tasks"
+                    >
+                        <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+                        Create Task
+                    </Link>
+
+                    {/* Ghost: Start Sprint */}
+                    <Link
+                        href="/sprints"
+                        id="qa-start-sprint"
+                        className="dash-action-secondary"
+                        aria-label="Go to Sprints"
+                    >
+                        <Timer className="h-3.5 w-3.5" aria-hidden="true" />
+                        Start Sprint
+                    </Link>
+
+                    {/* AI: Ask AI */}
+                    <button
+                        type="button"
+                        id="qa-ask-ai"
+                        onClick={openPanel}
+                        className="dash-action-ai"
+                        aria-label="Open AI assistant"
+                    >
+                        <Bot className="h-3.5 w-3.5" aria-hidden="true" />
+                        Ask AI
+                    </button>
+                </div>
             </section>
 
             {/* ════════════════════════════════════════
-                § 2  STATS GRID (4 cards)
+                § 2  KPI CARDS ROW
                 ════════════════════════════════════════
-                2-col on mobile → 4-col at lg.
-                lg breakpoint (1024px) is the correct threshold when the sidebar
-                is 256px wide, leaving ~768px for content — enough for 4 cards.
+                4-col desktop (lg+) · 2-col tablet · 1-col mobile.
+                No entrance animations (per user preference).
             */}
             <section
                 aria-label="Key metrics"
@@ -362,11 +366,11 @@ const DashboardPage = () => {
             {/* ════════════════════════════════════════
                 § 3  ANALYTICS
                 ════════════════════════════════════════
-                70/30 split at xl (≥1280px). Below that, single column stack.
-                Named fr fractions prevent the columns from ever blowing past
-                their parent's width.
+                7fr / 3fr split at xl (≥1280px). Single column below.
+                Chart: min-h-[350px], capped at 400px on lg+.
+                Activity panel: fixed height, independently scrollable.
             */}
-            <section aria-label="Analytics" className="space-y-4">
+            <section aria-label="Analytics" className="space-y-3">
                 <SectionHeading
                     eyebrow="Analytics"
                     title="Created vs completed"
@@ -375,38 +379,49 @@ const DashboardPage = () => {
 
                 <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,7fr)_minmax(0,3fr)]">
 
-                    {/* Activity chart card */}
+                    {/* ── Activity chart card ── */}
                     <Card padding="dashboard">
+                        {/* Chart header: title + live indicator + legend */}
                         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                            <div>
-                                <h3 className="text-base font-semibold text-white">Activity chart</h3>
-                                <p className="mt-0.5 text-sm text-slate-400">
-                                    Tasks created and completed over the last 7 days.
-                                </p>
+                            <div className="flex items-center gap-2.5">
+                                {/*
+                                 * Live indicator — 8px pulsing green dot.
+                                 * Signals "this data is live / real-time" — a Vercel dashboard pattern.
+                                 */}
+                                <span
+                                    className="h-2 w-2 shrink-0 rounded-full bg-emerald-400 animate-live-pulse"
+                                    aria-label="Live data"
+                                    role="img"
+                                />
+                                <div>
+                                    <h3 className="text-base font-semibold text-white">Activity chart</h3>
+                                    <p className="mt-0.5 text-sm text-slate-400">
+                                        Tasks created and completed over the last 7 days.
+                                    </p>
+                                </div>
                             </div>
                             {/* Legend */}
                             <div className="flex items-center gap-4 text-xs text-slate-400">
                                 <div className="flex items-center gap-1.5">
-                                    <span className="h-2 w-2 rounded-full bg-indigo-400" />
+                                    <span className="h-2 w-2 rounded-full bg-indigo-400" aria-hidden="true" />
                                     Completed
                                 </div>
                                 <div className="flex items-center gap-1.5">
-                                    <span className="h-2 w-2 rounded-full bg-emerald-400" />
+                                    <span className="h-2 w-2 rounded-full bg-emerald-400" aria-hidden="true" />
                                     Created
                                 </div>
                             </div>
                         </div>
 
                         {/*
-                         * Chart container height — responsive steps:
-                         *  h-48  (192px) on mobile  — visible, not dominant
-                         *  h-64  (256px) on sm       — comfortable reading
-                         *  h-80  (320px) on lg+      — full analytics view
+                         * Chart container — responsive height steps:
+                         *   280px mobile  : visible without dominating viewport
+                         *   350px lg+     : comfortable desktop analytics view
+                         *   max 400px      : prevents disproportionate height on tall screens
                          *
-                         * ResponsiveContainer fills 100% of this container.
-                         * No magic pixel values — all Tailwind scale.
+                         * min-h ensures the chart never collapses when data is empty.
                          */}
-                        <div className="mt-5 h-48 w-full sm:h-64 lg:h-80">
+                        <div className="mt-5 min-h-[280px] w-full lg:h-[390px]">
                             <ChartErrorBoundary>
                                 <ResponsiveContainer width="100%" height="100%">
                                     <AreaChart
@@ -462,8 +477,13 @@ const DashboardPage = () => {
                         </div>
                     </Card>
 
-                    {/* Recent activity card */}
-                    <Card padding="dashboard">
+                    {/* ── Recent activity card ── */}
+                    {/*
+                     * sticky top-24 makes the activity panel sticky within
+                     * the xl-grid column — it stays visible while the chart scrolls.
+                     * Fixed card height + scrollable inner list = "sticky sidebar" pattern.
+                     */}
+                    <Card padding="dashboard" className="xl:sticky xl:top-24 xl:self-start">
                         <div className="flex items-start justify-between gap-3">
                             <div>
                                 <h3 className="text-base font-semibold text-white">Recent activity</h3>
@@ -471,37 +491,56 @@ const DashboardPage = () => {
                                     Latest changes across your workspace.
                                 </p>
                             </div>
-                            <Sparkles className="h-4 w-4 shrink-0 text-slate-600" />
+                            <Sparkles className="h-4 w-4 shrink-0 text-slate-600" aria-hidden="true" />
                         </div>
 
-                        <div className="mt-5 space-y-2.5">
-                            {demoActivities.slice(0, 5).map((activity) => {
-                                const activityUser = getTeamMember(activity.userId);
-                                return (
-                                    <div
-                                        key={activity.id}
-                                        className="flex items-start gap-3 rounded-xl border border-slate-800 bg-slate-800/40 p-3"
-                                    >
-                                        <Avatar
-                                            name={activityUser?.name}
-                                            src={activityUser?.avatar}
-                                            size="sm"
-                                            className="shrink-0"
-                                        />
-                                        <div className="min-w-0 flex-1">
-                                            <p className="text-xs leading-5 text-slate-300">
-                                                <span className="font-medium text-white">
-                                                    {activityUser?.name || 'Teammate'}
-                                                </span>{' '}
-                                                {activity.message}
-                                            </p>
-                                            <p className="mt-1 text-[11px] text-slate-500">
-                                                {getRelativeTime(activity.createdAt)}
-                                            </p>
+                        {/*
+                         * activity-scroll-container = custom CSS class (globals.css):
+                         *   max-height: 400px + overflow-y: auto + fade-out top gradient.
+                         * This keeps the card height bounded and visually integrated
+                         * with the chart card beside it.
+                         */}
+                        <div className="activity-scroll-container mt-4">
+                            <div className="space-y-2 pt-1">
+                                {demoActivities.slice(0, 8).map((activity) => {
+                                    const activityUser = getTeamMember(activity.userId);
+                                    return (
+                                        <div
+                                            key={activity.id}
+                                            className="flex items-start gap-3 rounded-xl border border-slate-800 bg-slate-800/40 p-3 transition-colors hover:border-slate-700"
+                                        >
+                                            <Avatar
+                                                name={activityUser?.name}
+                                                src={activityUser?.avatar}
+                                                size="sm"
+                                                className="shrink-0"
+                                            />
+                                            <div className="min-w-0 flex-1">
+                                                <p className="text-xs leading-5 text-slate-300">
+                                                    <span className="font-medium text-white">
+                                                        {activityUser?.name || 'Teammate'}
+                                                    </span>{' '}
+                                                    {activity.message}
+                                                </p>
+                                                <p className="mt-1 text-[11px] text-slate-500">
+                                                    {getRelativeTime(activity.createdAt)}
+                                                </p>
+                                            </div>
                                         </div>
-                                    </div>
-                                );
-                            })}
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        {/* View all link */}
+                        <div className="mt-3 border-t border-slate-800/60 pt-3">
+                            <Link
+                                href="/activity"
+                                className="flex items-center gap-1.5 text-xs font-medium text-indigo-400 transition-colors hover:text-indigo-300"
+                            >
+                                View all activity
+                                <ArrowRight className="h-3 w-3" aria-hidden="true" />
+                            </Link>
                         </div>
                     </Card>
 
@@ -513,7 +552,7 @@ const DashboardPage = () => {
                 ════════════════════════════════════════
                 2-col at xl, 1-col below.
             */}
-            <section id="productivity-section" aria-label="Productivity" className="space-y-4">
+            <section id="productivity-section" aria-label="Productivity" className="space-y-3">
                 <SectionHeading
                     eyebrow="Productivity"
                     title="Daily execution"
@@ -531,7 +570,7 @@ const DashboardPage = () => {
                 ════════════════════════════════════════
                 2-col at xl, 1-col below.
             */}
-            <section aria-label="Task priority queue" className="space-y-4">
+            <section aria-label="Task priority queue" className="space-y-3">
                 <SectionHeading
                     eyebrow="Tasks"
                     title="Priority queue"

@@ -111,8 +111,8 @@ export default function ProtectedLayout({ children }) {
                  * p-6 = 24px outer padding on all sides (design system token).
                  * overflow-y-auto keeps content scrolling independent of sidebar.
                  */}
-                <main className="flex-1 overflow-y-auto p-4 sm:p-6">
-                    <div className="mx-auto w-full max-w-[1440px]">
+                <main className="flex-1 overflow-x-hidden overflow-y-auto p-6">
+                    <div className="mx-auto w-full max-w-[1600px]">
                         <ErrorBoundary>
                             {isAccessible ? children : <AccessDenied />}
                         </ErrorBoundary>

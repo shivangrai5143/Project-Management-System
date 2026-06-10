@@ -5,8 +5,8 @@
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 
   /* Sidebar sizing tokens */
-  --sidebar-expanded: 16rem;    /* 256px / w-64 */
-  --sidebar-collapsed: 5rem;    /* 80px  / w-20 */
+  --sidebar-expanded: 16.25rem; /* 260px / w-[260px] */
+  --sidebar-collapsed: 4.5rem;  /* 72px  / w-[72px]  */
 
   /* Custom Animations */
   --animate-slide-in: slideIn 0.3s ease-out forwards;
@@ -44,6 +44,11 @@
     0%, 100% { opacity: 1;   }
     50%       { opacity: 0.5; }
   }
+  @keyframes livePulse {
+    0%, 100% { opacity: 1;   transform: scale(1);    }
+    50%       { opacity: 0.5; transform: scale(0.85); }
+  }
+  --animate-live-pulse: livePulse 2s ease-in-out infinite;
 }
 
 /* ===== Base ===== */
@@ -125,9 +130,86 @@ body {
 .animate-slide-up      { animation: slideUp 0.3s ease-out forwards; }
 .animate-scale-in      { animation: scaleIn 0.2s ease-out forwards; }
 .animate-slide-in-right{ animation: slide-in-right 0.3s ease-out; }
+.animate-live-pulse    { animation: livePulse 2s ease-in-out infinite; }
 
 /* ===== Smooth transitions ===== */
 .transition-smooth { transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1); }
+
+/* ===== Dashboard action bar buttons ===== */
+.dash-action-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  background: #4f46e5;
+  color: #fff;
+  border: 1px solid transparent;
+  transition: background 0.15s, transform 0.15s;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.dash-action-primary:hover  { background: #4338ca; }
+.dash-action-primary:active { transform: scale(0.97); }
+
+.dash-action-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  background: rgba(30,41,59,0.7);
+  color: #cbd5e1;
+  border: 1px solid #334155;
+  transition: background 0.15s, border-color 0.15s, color 0.15s, transform 0.15s;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.dash-action-secondary:hover  { background: #1e293b; border-color: #475569; color: #f1f5f9; }
+.dash-action-secondary:active { transform: scale(0.97); }
+
+.dash-action-ai {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  background: rgba(139,92,246,0.10);
+  color: #c4b5fd;
+  border: 1px solid rgba(139,92,246,0.25);
+  transition: background 0.15s, border-color 0.15s, color 0.15s, transform 0.15s;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.dash-action-ai:hover  { background: rgba(139,92,246,0.18); border-color: rgba(139,92,246,0.4); color: #ede9fe; }
+.dash-action-ai:active { transform: scale(0.97); }
+
+/* ===== Activity scroll fade-out top edge ===== */
+.activity-scroll-container {
+  position: relative;
+  overflow-y: auto;
+  max-height: 400px;
+  scrollbar-width: thin;
+}
+.activity-scroll-container::before {
+  content: '';
+  position: sticky;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 24px;
+  display: block;
+  background: linear-gradient(to bottom, #0f172a, transparent);
+  z-index: 1;
+  pointer-events: none;
+  margin-bottom: -24px;
+}
 
 /* ===== Dark / Light color-scheme ===== */
 .dark  { color-scheme: dark;  }
@@ -208,3 +290,30 @@ body {
 
 /* Backdrop blur in light mode */
 .light .backdrop-blur-xl { background: rgba(255,255,255,0.88); }
+
+/* Dashboard action buttons — light mode */
+.light .dash-action-primary {
+  background: #4f46e5;
+  color: #fff;
+}
+.light .dash-action-primary:hover { background: #4338ca; }
+
+.light .dash-action-secondary {
+  background: rgba(241,245,249,0.9);
+  color: #334155;
+  border-color: #cbd5e1;
+}
+.light .dash-action-secondary:hover { background: #e2e8f0; border-color: #94a3b8; color: #0f172a; }
+
+.light .dash-action-ai {
+  background: rgba(139,92,246,0.08);
+  color: #7c3aed;
+  border-color: rgba(139,92,246,0.2);
+}
+.light .dash-action-ai:hover { background: rgba(139,92,246,0.14); color: #6d28d9; }
+
+/* Activity scroll container — light mode gradient override */
+.light .activity-scroll-container::before {
+  background: linear-gradient(to bottom, #ffffff, transparent);
+}
+
