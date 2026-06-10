@@ -13,9 +13,6 @@ import AIAgentPanel from '@/components/ai/AIAgentPanel';
 import AccessDenied from '@/app/(protected)/access-denied/page';
 import ErrorBoundary from '@/components/ui/ErrorBoundary';
 
-const SIDEBAR_EXPANDED_WIDTH = '16rem';
-const SIDEBAR_COLLAPSED_WIDTH = '5rem';
-
 export default function ProtectedLayout({ children }) {
     const { isAuthenticated, isLoading } = useAuth();
     const { canAccess } = useRBAC();
@@ -30,6 +27,11 @@ export default function ProtectedLayout({ children }) {
             router.push('/login');
         }
     }, [isAuthenticated, isLoading, router]);
+
+    // Close mobile sidebar on route change
+    useEffect(() => {
+        setIsMobileSidebarOpen(false);
+    }, [pathname]);
 
     if (isLoading) {
         return (
@@ -74,30 +76,48 @@ export default function ProtectedLayout({ children }) {
 
     const isAccessible = pathname === '/access-denied' || canAccess(pathname);
 
-    const desktopShellStyle = {
-        gridTemplateColumns: `${isSidebarCollapsed ? SIDEBAR_COLLAPSED_WIDTH : SIDEBAR_EXPANDED_WIDTH} minmax(0, 1fr)`,
-    };
-
     return (
-        <div className="min-h-screen bg-slate-950 text-slate-100">
-            <div className="lg:grid lg:min-h-screen" style={desktopShellStyle}>
-                <Sidebar
-                    isCollapsed={isSidebarCollapsed}
-                    isMobileOpen={isMobileSidebarOpen}
-                    onToggleCollapse={() => setIsSidebarCollapsed(current => !current)}
-                    onCloseMobile={() => setIsMobileSidebarOpen(false)}
+        /*
+         * Shell: two-column CSS Grid.
+         *  - Column 1: sidebar (self-sized via explicit w-* class on <aside>)
+         *  - Column 2: content (minmax(0,1fr) — prevents overflow blowout)
+         *
+         * The sidebar uses sticky+h-screen so it never scrolls with content.
+         * The content column is the scroll container.
+         */
+        <div className="flex min-h-screen bg-slate-950 text-slate-100">
+            {/* ── Sidebar ── */}
+            <Sidebar
+                isCollapsed={isSidebarCollapsed}
+                isMobileOpen={isMobileSidebarOpen}
+                onToggleCollapse={() => setIsSidebarCollapsed(c => !c)}
+                onCloseMobile={() => setIsMobileSidebarOpen(false)}
+            />
+
+            {/*
+             * Content column.
+             * min-w-0 is critical: without it, a flex child won't shrink
+             * below its content size, causing overflow.
+             */}
+            <div className="flex min-w-0 flex-1 flex-col">
+                {/* Sticky top navigation — 64px tall */}
+                <Header
+                    title={getPageTitle()}
+                    onMenuClick={() => setIsMobileSidebarOpen(true)}
                 />
 
-                <div className="min-w-0">
-                    <Header title={getPageTitle()} onMenuClick={() => setIsMobileSidebarOpen(true)} />
-                    <main className="px-4 py-6 sm:px-6 lg:px-6">
-                        <div className="mx-auto w-full max-w-[1440px]">
-                            <ErrorBoundary>
-                                {isAccessible ? children : <AccessDenied />}
-                            </ErrorBoundary>
-                        </div>
-                    </main>
-                </div>
+                {/*
+                 * Page content.
+                 * p-6 = 24px outer padding on all sides (design system token).
+                 * overflow-y-auto keeps content scrolling independent of sidebar.
+                 */}
+                <main className="flex-1 overflow-y-auto p-4 sm:p-6">
+                    <div className="mx-auto w-full max-w-[1440px]">
+                        <ErrorBoundary>
+                            {isAccessible ? children : <AccessDenied />}
+                        </ErrorBoundary>
+                    </div>
+                </main>
             </div>
 
             <ToastContainer toasts={toasts} onRemove={removeToast} />
