@@ -20,7 +20,7 @@ const allowedOrigins = [
 // Regex for allowing any *.vercel.app domain dynamically
 const vercelRegex = /^https:\/\/.*\.vercel\.app$/;
 
-app.use(cors({
+const corsOptions = {
     origin: function (origin, callback) {
         // Allow requests with no origin (server-to-server, curl, mobile apps)
         if (!origin) return callback(null, true);

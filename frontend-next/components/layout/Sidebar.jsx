@@ -115,17 +115,17 @@ function SidebarContent({
                                 href={item.path}
                                 onClick={onNavigate}
                                 title={isCollapsed ? item.label : undefined}
-                            className={`
-                                    flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-colors
-                                    ${active
+                                aria-current={active ? 'page' : undefined}
+                                className={[
+                                    'flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-colors overflow-hidden whitespace-nowrap',
+                                    active
                                         ? 'bg-indigo-500/10 text-indigo-300 ring-1 ring-indigo-500/20'
-                                        : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-200'
-                                    }
-                                    ${isCollapsed ? 'justify-center' : ''}
-                                `}
+                                        : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-200',
+                                    isCollapsed ? 'justify-center' : '',
+                                ].join(' ')}
                             >
-                            <item.icon className={`h-4 w-4 shrink-0 ${active ? 'text-indigo-400' : ''}`} />
-                            {!isCollapsed && <span className="truncate">{item.label}</span>}
+                                <item.icon className={`h-4 w-4 shrink-0 ${active ? 'text-indigo-400' : ''}`} />
+                                {!isCollapsed && <span className="truncate">{item.label}</span>}
                             </Link>
                         );
                     })}

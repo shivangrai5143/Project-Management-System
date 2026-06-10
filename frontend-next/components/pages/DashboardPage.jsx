@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { eachDayOfInterval, format, isSameDay, startOfDay, subDays } from 'date-fns';
 import {
@@ -19,8 +19,12 @@ import { useAuth } from '@/context/AuthContext';
 import { useAIAgent } from '@/context/AIAgentContext';
 import { useProjects } from '@/context/ProjectContext';
 import { useTasks } from '@/context/TaskContext';
+import { useNotifications } from '@/context/NotificationContext';
 import Card from '@/components/ui/Card';
 import StatsCard from '@/components/dashboard/StatsCard';
+import Modal from '@/components/ui/Modal';
+import ProjectForm from '@/components/projects/ProjectForm';
+import TaskForm from '@/components/tasks/TaskForm';
 import StandupWidget from '@/components/dashboard/StandupWidget';
 import AIInsightsCard from '@/components/ai/AIInsightsCard';
 import Badge from '@/components/ui/Badge';
@@ -157,8 +161,40 @@ const ChartTooltip = ({ active, payload, label }) => {
 const DashboardPage = () => {
     const { user } = useAuth();
     const { openPanel } = useAIAgent();
-    const { projects, getTeamMember } = useProjects();
-    const { tasks, getTaskStats, getTasksByAssignee } = useTasks();
+    const { projects, createProject, getTeamMember } = useProjects();
+    const { tasks, getTaskStats, getTasksByAssignee, createTask } = useTasks();
+    const { showToast } = useNotifications();
+
+    const [showNewProject, setShowNewProject] = useState(false);
+    const [showNewTask, setShowNewTask]       = useState(false);
+    const [isCreatingProject, setIsCreatingProject] = useState(false);
+    const [isCreatingTask, setIsCreatingTask]       = useState(false);
+
+    const handleCreateProject = async (formData) => {
+        setIsCreatingProject(true);
+        try {
+            await createProject(formData);
+            setShowNewProject(false);
+            showToast(`Project "${formData.name}" created!`, 'success');
+        } catch (err) {
+            showToast('Failed to create project. Try again.', 'error');
+        } finally {
+            setIsCreatingProject(false);
+        }
+    };
+
+    const handleCreateTask = async (formData) => {
+        setIsCreatingTask(true);
+        try {
+            await createTask(formData);
+            setShowNewTask(false);
+            showToast(`Task "${formData.title}" created!`, 'success');
+        } catch (err) {
+            showToast('Failed to create task. Try again.', 'error');
+        } finally {
+            setIsCreatingTask(false);
+        }
+    };
 
     const stats       = getTaskStats();
     const firstName   = user?.name ? user.name.split(' ')[0] : 'there';
@@ -226,11 +262,15 @@ const DashboardPage = () => {
     ];
 
     return (
-        /*
-         * Root: space-y-6 = 24px between sections.
+        <>
          * Tighter than the old space-y-8 — sections feel like one workspace
          * rather than isolated pages (Linear / Notion aesthetic).
          */
+        {/*
+         * Root: space-y-6 = 24px between sections.
+         * Tighter than the old space-y-8 — sections feel like one workspace
+         * rather than isolated panels (Linear / Notion aesthetic).
+         */}
         <div className="space-y-6">
 
             {/* ════════════════════════════════════════
@@ -293,27 +333,29 @@ const DashboardPage = () => {
                     aria-label="Quick actions"
                     className="flex flex-wrap items-center gap-2 border-t border-slate-800/60 pt-4"
                 >
-                    {/* Primary: New Project */}
-                    <Link
-                        href="/projects"
+                    {/* Primary: New Project — opens modal */}
+                    <button
+                        type="button"
                         id="qa-new-project"
+                        onClick={() => setShowNewProject(true)}
                         className="dash-action-primary"
-                        aria-label="Go to Projects"
+                        aria-label="Create a new project"
                     >
                         <FolderKanban className="h-3.5 w-3.5" aria-hidden="true" />
                         New Project
-                    </Link>
+                    </button>
 
-                    {/* Secondary: Create Task */}
-                    <Link
-                        href="/tasks"
+                    {/* Secondary: Create Task — opens modal */}
+                    <button
+                        type="button"
                         id="qa-create-task"
+                        onClick={() => setShowNewTask(true)}
                         className="dash-action-secondary"
-                        aria-label="Go to Tasks"
+                        aria-label="Create a new task"
                     >
                         <Plus className="h-3.5 w-3.5" aria-hidden="true" />
                         Create Task
-                    </Link>
+                    </button>
 
                     {/* Ghost: Start Sprint */}
                     <Link
@@ -619,6 +661,34 @@ const DashboardPage = () => {
             </section>
 
         </div>
+
+        {/* ── Quick Action Modals ── */}
+        <Modal
+            isOpen={showNewProject}
+            onClose={() => setShowNewProject(false)}
+            title="New Project"
+            size="md"
+        >
+            <ProjectForm
+                onSubmit={handleCreateProject}
+                onCancel={() => setShowNewProject(false)}
+                isLoading={isCreatingProject}
+            />
+        </Modal>
+
+        <Modal
+            isOpen={showNewTask}
+            onClose={() => setShowNewTask(false)}
+            title="Create Task"
+            size="lg"
+        >
+            <TaskForm
+                onSubmit={handleCreateTask}
+                onCancel={() => setShowNewTask(false)}
+                isLoading={isCreatingTask}
+            />
+        </Modal>
+        </>
     );
 };
 
