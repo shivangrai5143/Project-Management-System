@@ -2,18 +2,20 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { eachDayOfInterval, format, isSameDay, startOfDay, subDays } from 'date-fns';
 import {
     AlertTriangle,
     ArrowRight,
     Bot,
+    Bug,
     CheckCircle2,
     Clock3,
     FolderKanban,
+    Gauge,
     ListTodo,
     Plus,
     Sparkles,
     Timer,
+    Users,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useAIAgent } from '@/context/AIAgentContext';
@@ -27,43 +29,18 @@ import ProjectForm from '@/components/projects/ProjectForm';
 import TaskForm from '@/components/tasks/TaskForm';
 import StandupWidget from '@/components/dashboard/StandupWidget';
 import AIInsightsCard from '@/components/ai/AIInsightsCard';
+import AnalyticsGrid from '@/components/dashboard/AnalyticsGrid';
+import UpcomingDeadlines from '@/components/dashboard/UpcomingDeadlines';
+import DashboardSkeleton from '@/components/dashboard/DashboardSkeleton';
 import Badge from '@/components/ui/Badge';
 import Avatar from '@/components/ui/Avatar';
-import { ChartErrorBoundary } from '@/components/ui/ErrorBoundary';
 import { demoActivities } from '@/data/mockData';
-import { formatDate, getRelativeTime, isDueSoon, isOverdue } from '@/utils/helpers';
+import { formatDate, getRelativeTime, isOverdue, isDueSoon } from '@/utils/helpers';
 import { PRIORITY_CONFIG, STATUS_CONFIG } from '@/utils/constants';
-import {
-    Area,
-    AreaChart,
-    CartesianGrid,
-    ResponsiveContainer,
-    Tooltip,
-    XAxis,
-    YAxis,
-} from 'recharts';
-
-/* ─────────────────────────────────────────────────────────────
-   Chart data builder — 7-day rolling window
-───────────────────────────────────────────────────────────── */
-const buildChartData = (tasks) => {
-    const end  = startOfDay(new Date());
-    const days = eachDayOfInterval({ start: subDays(end, 6), end });
-
-    return days.map((day) => ({
-        label: format(day, 'EEE'),
-        created: tasks.filter(
-            t => t.createdAt && isSameDay(new Date(t.createdAt), day)
-        ).length,
-        completed: tasks.filter(
-            t => t.status === 'done' && t.updatedAt && isSameDay(new Date(t.updatedAt), day)
-        ).length,
-    }));
-};
 
 /* ─────────────────────────────────────────────────────────────
    Section heading — consistent eyebrow / title / description
-   pattern across all dashboard sections.
+   pattern across all dashboard sections (Notion aesthetic).
 ───────────────────────────────────────────────────────────── */
 const SectionHeading = ({ eyebrow, title, description, action }) => (
     <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
@@ -134,35 +111,14 @@ const TaskListCard = ({
 );
 
 /* ─────────────────────────────────────────────────────────────
-   Custom Recharts tooltip
-───────────────────────────────────────────────────────────── */
-const ChartTooltip = ({ active, payload, label }) => {
-    if (!active || !payload?.length) return null;
-    return (
-        <div className="rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-sm shadow-xl">
-            <p className="mb-2 font-medium text-white">{label}</p>
-            {payload.map((entry) => (
-                <div key={entry.dataKey} className="flex items-center gap-2">
-                    <span
-                        className="h-2 w-2 shrink-0 rounded-full"
-                        style={{ backgroundColor: entry.color }}
-                    />
-                    <span className="text-slate-400 capitalize">{entry.dataKey}:</span>
-                    <span className="font-medium text-white">{entry.value}</span>
-                </div>
-            ))}
-        </div>
-    );
-};
-
-/* ─────────────────────────────────────────────────────────────
-   Dashboard page
+   Dashboard page — redesigned with Linear/Jira/Notion/Stripe
+   aesthetic and 12-column responsive grid.
 ───────────────────────────────────────────────────────────── */
 const DashboardPage = () => {
     const { user } = useAuth();
     const { openPanel } = useAIAgent();
     const { projects, createProject, getTeamMember } = useProjects();
-    const { tasks, getTaskStats, getTasksByAssignee, createTask } = useTasks();
+    const { tasks, isLoading, getTaskStats, getTasksByAssignee, createTask } = useTasks();
     const { showToast } = useNotifications();
 
     const [showNewProject, setShowNewProject] = useState(false);
@@ -196,6 +152,7 @@ const DashboardPage = () => {
         }
     };
 
+    /* ── Derived data ── */
     const stats       = getTaskStats();
     const firstName   = user?.name ? user.name.split(' ')[0] : 'there';
     const myTasks     = user ? getTasksByAssignee(user.id) : [];
@@ -207,6 +164,28 @@ const DashboardPage = () => {
         () => Object.fromEntries(projects.map(p => [p.id, p.name])),
         [projects]
     );
+
+    /* Sprint progress — simulated from tasks in-progress + done ratio */
+    const sprintProgress = useMemo(() => {
+        const sprintTasks = tasks.filter(t => t.status === 'in-progress' || t.status === 'review' || t.status === 'done');
+        if (tasks.length === 0) return 0;
+        return Math.round((sprintTasks.length / tasks.length) * 100);
+    }, [tasks]);
+
+    /* Bug count — tasks with 'bug' label that aren't done */
+    const bugStats = useMemo(() => {
+        const allBugs = tasks.filter(t => t.labels?.includes('bug'));
+        const openBugs = allBugs.filter(t => t.status !== 'done');
+        const criticalBugs = openBugs.filter(t => t.priority === 'high' || t.priority === 'urgent');
+        return { total: allBugs.length, open: openBugs.length, critical: criticalBugs.length };
+    }, [tasks]);
+
+    /* Team productivity — completion rate with comparison */
+    const teamProductivity = useMemo(() => {
+        const rate = completionRate;
+        const trend = rate >= 70 ? 'positive' : rate >= 40 ? 'neutral' : 'negative';
+        return { rate, trend };
+    }, [completionRate]);
 
     const overdueTasks = useMemo(
         () => tasks
@@ -224,51 +203,62 @@ const DashboardPage = () => {
         [tasks]
     );
 
-    const chartData = useMemo(() => buildChartData(tasks), [tasks]);
-
+    /* ── 5 KPI cards definition ── */
     const statsCards = [
         {
-            title:      'Total Tasks',
-            value:      stats.total,
-            change:     `${openTasks} open tasks`,
+            title:      'Total Projects',
+            value:      projects.length,
+            change:     `${openTasks} active tasks`,
+            changeType: 'neutral',
+            icon:       FolderKanban,
+            tone:       'indigo',
+        },
+        {
+            title:      'Active Tasks',
+            value:      openTasks,
+            change:     `${stats.inProgress} in progress`,
             changeType: 'neutral',
             icon:       ListTodo,
-            tone:       'slate',
+            tone:       'cyan',
         },
         {
-            title:      'Completed',
-            value:      stats.done,
-            change:     `${completionRate}% completion rate`,
+            title:      'Sprint Progress',
+            value:      `${sprintProgress}%`,
+            change:     `${stats.done} completed`,
             changeType: 'positive',
-            icon:       CheckCircle2,
+            icon:       Gauge,
             tone:       'emerald',
+            progress:   sprintProgress,
         },
         {
-            title:      'In Progress',
-            value:      stats.inProgress,
-            change:     `${stats.review} in review`,
-            changeType: 'neutral',
-            icon:       Clock3,
-            tone:       'amber',
-        },
-        {
-            title:      'Overdue',
-            value:      stats.overdue,
-            change:     stats.overdue > 0 ? 'Needs attention' : 'On track',
-            changeType: stats.overdue > 0 ? 'negative' : 'positive',
-            icon:       AlertTriangle,
+            title:      'Open Bugs',
+            value:      bugStats.open,
+            change:     bugStats.critical > 0 ? `${bugStats.critical} critical` : 'No critical bugs',
+            changeType: bugStats.critical > 0 ? 'negative' : 'positive',
+            icon:       Bug,
             tone:       'rose',
+        },
+        {
+            title:      'Team Productivity',
+            value:      `${teamProductivity.rate}%`,
+            change:     `${stats.done}/${stats.total} tasks completed`,
+            changeType: teamProductivity.trend,
+            icon:       Users,
+            tone:       'violet',
+            progress:   teamProductivity.rate,
         },
     ];
 
+    /* ── Show skeleton while loading ── */
+    if (isLoading) {
+        return <DashboardSkeleton />;
+    }
+
     return (
         <>
-         * Tighter than the old space-y-8 — sections feel like one workspace
-         * rather than isolated pages (Linear / Notion aesthetic).
-         */
         {/*
          * Root: space-y-6 = 24px between sections.
-         * Tighter than the old space-y-8 — sections feel like one workspace
+         * Tighter than space-y-8 — sections feel like one workspace
          * rather than isolated panels (Linear / Notion aesthetic).
          */}
         <div className="space-y-6">
@@ -316,18 +306,6 @@ const DashboardPage = () => {
                 </div>
 
                 {/* ── Horizontal Quick Action Bar ── */}
-                {/*
-                 * Horizontal action toolbar directly beneath the greeting.
-                 * This is the key UX change: replaces the 300px right-panel card.
-                 * Buttons are styled via globals.css utility classes for portability.
-                 * flex-wrap ensures graceful collapse on small screens.
-                 *
-                 * Actions:
-                 *   New Project  → navigate to /projects (primary CTA)
-                 *   Create Task  → navigate to /tasks
-                 *   Start Sprint → navigate to /sprints
-                 *   Ask AI       → open the AI panel
-                 */}
                 <div
                     role="toolbar"
                     aria-label="Quick actions"
@@ -383,14 +361,14 @@ const DashboardPage = () => {
             </section>
 
             {/* ════════════════════════════════════════
-                § 2  KPI CARDS ROW
+                § 2  KPI CARDS ROW — 5 cards
                 ════════════════════════════════════════
-                4-col desktop (lg+) · 2-col tablet · 1-col mobile.
-                No entrance animations (per user preference).
+                2-col mobile · 3-col tablet · 5-col desktop.
+                12-column grid: each card spans ~2.4 cols at xl.
             */}
             <section
                 aria-label="Key metrics"
-                className="grid grid-cols-2 gap-4 lg:grid-cols-4"
+                className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-5"
             >
                 {statsCards.map((card) => (
                     <StatsCard
@@ -401,147 +379,57 @@ const DashboardPage = () => {
                         changeType={card.changeType}
                         icon={card.icon}
                         tone={card.tone}
+                        progress={card.progress}
                     />
                 ))}
             </section>
 
             {/* ════════════════════════════════════════
-                § 3  ANALYTICS
+                § 3  ANALYTICS — 4 charts in 2×2 grid
                 ════════════════════════════════════════
-                7fr / 3fr split at xl (≥1280px). Single column below.
-                Chart: min-h-[350px], capped at 400px on lg+.
-                Activity panel: fixed height, independently scrollable.
+                Task Completion Trend, Sprint Velocity,
+                Team Workload, Bug Resolution Trend.
             */}
             <section aria-label="Analytics" className="space-y-3">
                 <SectionHeading
                     eyebrow="Analytics"
-                    title="Created vs completed"
-                    description="7-day task throughput and delivery pace."
+                    title="Performance overview"
+                    description="Track velocity, workload distribution, and delivery trends."
+                />
+                <AnalyticsGrid />
+            </section>
+
+            {/* ════════════════════════════════════════
+                § 4  ACTIVITY FEED + UPCOMING DEADLINES
+                ════════════════════════════════════════
+                7fr / 5fr split at xl. Single column below.
+            */}
+            <section aria-label="Activity & Deadlines" className="space-y-3">
+                <SectionHeading
+                    eyebrow="Timeline"
+                    title="Activity & deadlines"
+                    description="Recent workspace changes and upcoming due dates."
                 />
 
-                <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,7fr)_minmax(0,3fr)]">
+                <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
 
-                    {/* ── Activity chart card ── */}
+                    {/* ── Recent activity card ── */}
                     <Card padding="dashboard">
-                        {/* Chart header: title + live indicator + legend */}
-                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                            <div className="flex items-center gap-2.5">
-                                {/*
-                                 * Live indicator — 8px pulsing green dot.
-                                 * Signals "this data is live / real-time" — a Vercel dashboard pattern.
-                                 */}
-                                <span
-                                    className="h-2 w-2 shrink-0 rounded-full bg-emerald-400 animate-live-pulse"
-                                    aria-label="Live data"
-                                    role="img"
-                                />
+                        <div className="flex items-start justify-between gap-3">
+                            <div className="flex items-start gap-3">
+                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-indigo-500/20 bg-indigo-500/10 text-indigo-300">
+                                    <Sparkles className="h-4 w-4" />
+                                </div>
                                 <div>
-                                    <h3 className="text-base font-semibold text-white">Activity chart</h3>
+                                    <h3 className="text-base font-semibold text-white">Recent activity</h3>
                                     <p className="mt-0.5 text-sm text-slate-400">
-                                        Tasks created and completed over the last 7 days.
+                                        Latest changes across your workspace.
                                     </p>
                                 </div>
                             </div>
-                            {/* Legend */}
-                            <div className="flex items-center gap-4 text-xs text-slate-400">
-                                <div className="flex items-center gap-1.5">
-                                    <span className="h-2 w-2 rounded-full bg-indigo-400" aria-hidden="true" />
-                                    Completed
-                                </div>
-                                <div className="flex items-center gap-1.5">
-                                    <span className="h-2 w-2 rounded-full bg-emerald-400" aria-hidden="true" />
-                                    Created
-                                </div>
-                            </div>
+                            <Badge variant="default" size="md">{demoActivities.length}</Badge>
                         </div>
 
-                        {/*
-                         * Chart container — responsive height steps:
-                         *   280px mobile  : visible without dominating viewport
-                         *   350px lg+     : comfortable desktop analytics view
-                         *   max 400px      : prevents disproportionate height on tall screens
-                         *
-                         * min-h ensures the chart never collapses when data is empty.
-                         */}
-                        <div className="mt-5 min-h-[280px] w-full lg:h-[390px]">
-                            <ChartErrorBoundary>
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <AreaChart
-                                        data={chartData}
-                                        margin={{ top: 4, right: 4, left: -24, bottom: 0 }}
-                                    >
-                                        <defs>
-                                            <linearGradient id="completedGradient" x1="0" y1="0" x2="0" y2="1">
-                                                <stop offset="0%"   stopColor="#818cf8" stopOpacity={0.3} />
-                                                <stop offset="100%" stopColor="#818cf8" stopOpacity={0}   />
-                                            </linearGradient>
-                                            <linearGradient id="createdGradient" x1="0" y1="0" x2="0" y2="1">
-                                                <stop offset="0%"   stopColor="#34d399" stopOpacity={0.25} />
-                                                <stop offset="100%" stopColor="#34d399" stopOpacity={0}    />
-                                            </linearGradient>
-                                        </defs>
-
-                                        <CartesianGrid
-                                            vertical={false}
-                                            stroke="#1e293b"
-                                            strokeDasharray="4 4"
-                                        />
-                                        <XAxis
-                                            dataKey="label"
-                                            axisLine={false}
-                                            tickLine={false}
-                                            tick={{ fill: '#64748b', fontSize: 11 }}
-                                        />
-                                        <YAxis
-                                            allowDecimals={false}
-                                            axisLine={false}
-                                            tickLine={false}
-                                            tick={{ fill: '#64748b', fontSize: 11 }}
-                                        />
-                                        <Tooltip content={<ChartTooltip />} />
-                                        <Area
-                                            type="monotone"
-                                            dataKey="completed"
-                                            stroke="#818cf8"
-                                            strokeWidth={2}
-                                            fill="url(#completedGradient)"
-                                        />
-                                        <Area
-                                            type="monotone"
-                                            dataKey="created"
-                                            stroke="#34d399"
-                                            strokeWidth={2}
-                                            fill="url(#createdGradient)"
-                                        />
-                                    </AreaChart>
-                                </ResponsiveContainer>
-                            </ChartErrorBoundary>
-                        </div>
-                    </Card>
-
-                    {/* ── Recent activity card ── */}
-                    {/*
-                     * sticky top-24 makes the activity panel sticky within
-                     * the xl-grid column — it stays visible while the chart scrolls.
-                     * Fixed card height + scrollable inner list = "sticky sidebar" pattern.
-                     */}
-                    <Card padding="dashboard" className="xl:sticky xl:top-24 xl:self-start">
-                        <div className="flex items-start justify-between gap-3">
-                            <div>
-                                <h3 className="text-base font-semibold text-white">Recent activity</h3>
-                                <p className="mt-0.5 text-sm text-slate-400">
-                                    Latest changes across your workspace.
-                                </p>
-                            </div>
-                            <Sparkles className="h-4 w-4 shrink-0 text-slate-600" aria-hidden="true" />
-                        </div>
-
-                        {/*
-                         * activity-scroll-container = custom CSS class (globals.css):
-                         *   max-height: 400px + overflow-y: auto + fade-out top gradient.
-                         * This keeps the card height bounded and visually integrated
-                         * with the chart card beside it.
-                         */}
                         <div className="activity-scroll-container mt-4">
                             <div className="space-y-2 pt-1">
                                 {demoActivities.slice(0, 8).map((activity) => {
@@ -586,11 +474,13 @@ const DashboardPage = () => {
                         </div>
                     </Card>
 
+                    {/* ── Upcoming Deadlines ── */}
+                    <UpcomingDeadlines />
                 </div>
             </section>
 
             {/* ════════════════════════════════════════
-                § 4  PRODUCTIVITY
+                § 5  AI INSIGHTS + STANDUP
                 ════════════════════════════════════════
                 2-col at xl, 1-col below.
             */}
@@ -608,7 +498,7 @@ const DashboardPage = () => {
             </section>
 
             {/* ════════════════════════════════════════
-                § 5  TASKS PRIORITY QUEUE
+                § 6  TASKS PRIORITY QUEUE
                 ════════════════════════════════════════
                 2-col at xl, 1-col below.
             */}

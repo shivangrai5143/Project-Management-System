@@ -13,26 +13,43 @@ const TONE_STYLES = {
         icon:   'bg-slate-800   text-slate-300  border-slate-700',
         accent: 'text-slate-300',
         bar:    'bg-slate-600/60',
+        progress: 'from-slate-500 to-slate-400',
     },
     indigo:  {
         icon:   'bg-indigo-500/10 text-indigo-300 border-indigo-500/20',
         accent: 'text-indigo-300',
         bar:    'bg-indigo-500/70',
+        progress: 'from-indigo-500 to-purple-500',
     },
     emerald: {
         icon:   'bg-emerald-500/10 text-emerald-300 border-emerald-500/20',
         accent: 'text-emerald-300',
         bar:    'bg-emerald-500/70',
+        progress: 'from-emerald-500 to-teal-500',
     },
     amber:   {
         icon:   'bg-amber-500/10 text-amber-300  border-amber-500/20',
         accent: 'text-amber-300',
         bar:    'bg-amber-500/70',
+        progress: 'from-amber-500 to-orange-500',
     },
     rose:    {
         icon:   'bg-red-500/10   text-red-300    border-red-500/20',
         accent: 'text-red-300',
         bar:    'bg-red-500/70',
+        progress: 'from-red-500 to-pink-500',
+    },
+    violet:  {
+        icon:   'bg-violet-500/10 text-violet-300 border-violet-500/20',
+        accent: 'text-violet-300',
+        bar:    'bg-violet-500/70',
+        progress: 'from-violet-500 to-purple-500',
+    },
+    cyan:    {
+        icon:   'bg-cyan-500/10 text-cyan-300 border-cyan-500/20',
+        accent: 'text-cyan-300',
+        bar:    'bg-cyan-500/70',
+        progress: 'from-cyan-500 to-blue-500',
     },
 };
 
@@ -49,6 +66,7 @@ const StatsCard = ({
     changeType = 'neutral',
     icon: Icon,
     tone = 'indigo',
+    progress,
 }) => {
     const toneStyle = TONE_STYLES[tone] ?? TONE_STYLES.indigo;
 
@@ -90,6 +108,21 @@ const StatsCard = ({
                     <p className="text-3xl font-bold tabular-nums tracking-tight text-white">
                         {value}
                     </p>
+
+                    {/* ── Optional progress bar ── */}
+                    {progress !== undefined && (
+                        <div className="space-y-1.5">
+                            <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-800">
+                                <div
+                                    className={`h-full rounded-full bg-gradient-to-r ${toneStyle.progress} transition-all duration-700 ease-out`}
+                                    style={{ width: `${Math.min(Math.max(progress, 0), 100)}%` }}
+                                />
+                            </div>
+                            <p className="text-[11px] tabular-nums text-slate-500">
+                                {Math.round(progress)}% complete
+                            </p>
+                        </div>
+                    )}
 
                     {/* ── Change indicator ── */}
                     {change !== undefined && (

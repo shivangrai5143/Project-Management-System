@@ -119,7 +119,7 @@ export async function fetchTimeline({ scope = 'global', projectId, userId, limit
     if (userId)    params.set('userId', userId);
     if (cursor)    params.set('cursor', cursor);
 
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+    const baseUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000').replace(/\/+$/, '');
     const res = await fetch(`${baseUrl}/api/activity?${params.toString()}`, {
         headers: { Authorization: `Bearer ${token}` },
     });

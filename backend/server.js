@@ -47,7 +47,7 @@ const corsOptions = {
 app.use(cors(corsOptions));
 
 // Handle OPTIONS preflight for all routes globally
-app.options('*', cors(corsOptions));
+app.options('{*path}', cors(corsOptions));
 
 // Parse JSON bodies
 app.use(express.json({ limit: '10mb' }));
