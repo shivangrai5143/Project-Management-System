@@ -69,7 +69,8 @@ export function ActivityProvider({ children }) {
             setNextCursor(data.nextCursor || null);
             setHasMore(data.hasMore || false);
         } catch (err) {
-            console.error('[ActivityContext] Load error:', err);
+            // Backend may be unavailable in development; warn instead of error
+            console.warn('[ActivityContext] Could not load activity timeline:', err.message);
             setError(err.message || 'Failed to load activity');
         } finally {
             setIsLoading(false);
