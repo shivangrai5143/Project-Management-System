@@ -1,27 +1,16 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Input from '@/components/ui/Input';
-import Select from '@/components/ui/Select';
 import Button from '@/components/ui/Button';
 import { PROJECT_COLORS } from '@/utils/constants';
 
 const ProjectForm = ({ project, onSubmit, onCancel, isLoading }) => {
     const [formData, setFormData] = useState({
-        name: '',
-        description: '',
-        color: PROJECT_COLORS[0],
+        name: project?.name || '',
+        description: project?.description || '',
+        color: project?.color || PROJECT_COLORS[0],
     });
-
-    useEffect(() => {
-        if (project) {
-            setFormData({
-                name: project.name || '',
-                description: project.description || '',
-                color: project.color || PROJECT_COLORS[0],
-            });
-        }
-    }, [project]);
 
     const handleSubmit = (e) => {
         e.preventDefault();

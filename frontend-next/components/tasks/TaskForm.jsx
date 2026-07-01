@@ -1,40 +1,39 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Input from '@/components/ui/Input';
 import Select from '@/components/ui/Select';
 import Button from '@/components/ui/Button';
 import { useProjects } from '@/context/ProjectContext';
 import { PRIORITIES, TASK_STATUSES, DEFAULT_LABELS } from '@/utils/constants';
 
-const TaskForm = ({ task, projectId, onSubmit, onCancel, isLoading }) => {
+const buildInitialFormData = (task, defaults, projectId) => ({
+    title: task?.title ?? defaults?.title ?? '',
+    description: task?.description ?? defaults?.description ?? '',
+    status: task?.status ?? defaults?.status ?? TASK_STATUSES.TODO,
+    priority: task?.priority ?? defaults?.priority ?? PRIORITIES.MEDIUM,
+    assigneeId: task?.assigneeId ?? defaults?.assigneeId ?? '',
+    projectId: task?.projectId ?? defaults?.projectId ?? projectId ?? '',
+    dueDate: task?.dueDate
+        ? task.dueDate.split('T')[0]
+        : defaults?.dueDate
+            ? defaults.dueDate.split('T')[0]
+            : '',
+    labels: task?.labels ?? defaults?.labels ?? [],
+});
+
+const TaskForm = ({
+    task,
+    defaults,
+    projectId,
+    onSubmit,
+    onCancel,
+    isLoading,
+    submitLabel,
+}) => {
     const { team, projects } = useProjects();
 
-    const [formData, setFormData] = useState({
-        title: '',
-        description: '',
-        status: TASK_STATUSES.TODO,
-        priority: PRIORITIES.MEDIUM,
-        assigneeId: '',
-        projectId: projectId || '',
-        dueDate: '',
-        labels: [],
-    });
-
-    useEffect(() => {
-        if (task) {
-            setFormData({
-                title: task.title || '',
-                description: task.description || '',
-                status: task.status || TASK_STATUSES.TODO,
-                priority: task.priority || PRIORITIES.MEDIUM,
-                assigneeId: task.assigneeId || '',
-                projectId: task.projectId || projectId || '',
-                dueDate: task.dueDate ? task.dueDate.split('T')[0] : '',
-                labels: task.labels || [],
-            });
-        }
-    }, [task, projectId]);
+    const [formData, setFormData] = useState(buildInitialFormData(task, defaults, projectId));
 
     const handleSubmit = (e) => {
         e.preventDefault();
@@ -172,7 +171,7 @@ const TaskForm = ({ task, projectId, onSubmit, onCancel, isLoading }) => {
                     Cancel
                 </Button>
                 <Button type="submit" loading={isLoading} className="flex-1">
-                    {task ? 'Update Task' : 'Create Task'}
+                    {submitLabel || (task ? 'Update Task' : 'Create Task')}
                 </Button>
             </div>
         </form>
